@@ -1,5 +1,7 @@
 import numpy as np
 import constants as const
+from scipy.integrate import odeint, simps
+from scipy.interpolate import interp1d
 
 """
 
@@ -17,63 +19,64 @@ PI = np.pi
 
 
 class Grid:
-    def __init__(self, nr, nt, na, rin, rout):
+    def __init__(self, nr, nt, naz, rin, rout):
 
-    # parameters
-    self.nr = nr
-    self.nt = nt
-    self.naz = na
-    self.ncells = self.nr * self.nt * self.naz
-    self.r_in = rin * AU
-    self.r_out = rout * AU
+        # parameters
+        self.nr = nr
+        self.ntheta = nt
+        self.nphi = naz
+        self.ncells = self.nr * self.ntheta * self.nphi
+        self.r_in = rin * AU
+        self.r_out = rout * AU
 
-    ### RADIAL GRID
+        ### RADIAL GRID
 
-    # define cell walls and centers
-    """ not sure about the centers defined in this way... """
-    self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out), nr+1)
-    self.r_centers = 0.5 * (self.r_walls[:-1] + self.r_walls[1:])
+        # define cell walls and centers
+        """ not sure about the centers defined in this way... """
+        self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out), 
+                                   nr+1)
+        self.r_centers = 0.5 * (self.r_walls[:-1] + self.r_walls[1:])
 
     
-    ### THETA GRID (= zenith angle)
+        ### THETA GRID (= zenith angle)
     
-    # set a slight offset bound at pole
-    po = 0.1
+        # set a slight offset bound at pole
+        po = 0.1
 
-    # define cell walls and centers
-    """ not sure about the centers defined in this way... """
-    self.t_walls = 0.5*PI + po - \
-                   np.logspace(np.log10(po), np.log10(0.5*PI+po), nt+1)[::-1]
-    self.t_centers = 0.5 * (self.t_walls[:-1] + self.t_walls[1:])
-
-
-    ### PHI GRID (= azimuth)
-
-    # define cell walls and centers
-    self.az_walls = np.array([0.0, 0.0])
-    self.az_centers = np.array([0.0])
+        # define cell walls and centers
+        """ not sure about the centers defined in this way... """
+        self.theta_walls = 0.5*PI + po - np.logspace(np.log10(po), 
+                           np.log10(0.5*PI+po), nt+1)[::-1]
+        self.theta_centers = 0.5*(self.theta_walls[:-1]+self.theta_walls[1:])
 
 
-    ### OUTPUT
+        ### PHI GRID (= azimuth)
 
-    # open file
-    f = open('amr_grid.inp', 'w')
+        # define cell walls and centers
+        self.phi_walls = np.array([0.0, 0.0])
+        self.phi_centers = np.array([0.0])
 
-    # file header
-    f.write('1\n')	# format code
-    f.write('0\n')	# regular grid
-    f.write('100\n')	# spherical coordinate system
-    f.write('0\n')	# no grid info written to file (as recommended)
-    f.write('1 1 1\n')	# 
-    f.write('%d %d %d\n' % (self.nr, self.nt, self.naz))
 
-    # write wall coordinates to file
-    for r in self.r_walls: f.write('%.9e\n' % r)
-    for t in self.t_walls: f.write('%.9e\n' % t)
-    for az in self.az_walls: f.write('%.9e\n' % az)
+        ### OUTPUT
 
-    # close file
-    f.close()
+        # open file
+        f = open('amr_grid.inp', 'w')
+
+        # file header
+        f.write('1\n')	# format code
+        f.write('0\n')	# regular grid
+        f.write('100\n')	# spherical coordinate system
+        f.write('0\n')	# no grid info written to file (as recommended)
+        f.write('1 1 1\n')	# 
+        f.write('%d %d %d\n' % (self.nr, self.ntheta, self.nphi))
+
+        # write wall coordinates to file
+        for r in self.r_walls: f.write('%.9e\n' % r)
+        for t in self.theta_walls: f.write('%.9e\n' % t)
+        for az in self.phi_walls: f.write('%.9e\n' % az)
+
+        # close file
+        f.close()
 
 
 
@@ -82,66 +85,146 @@ class DiskModel:
                               Sig0_g, R0_g, pg1, pg2, 
                        T0_mid, q_mid, T0_atm, q_atm, delta):
 
-    # stellar properties
-    self.Mstar = Mstar * Msun
+        # stellar properties
+        self.Mstar = Mstar * Msun
 
-    # dust surface density parameters
-    self.Sig0_d = np.float64(Sig0_d)
-    self.R0_d = R0_d * AU
-    self.pd1 = np.float64(pd1)
-    self.pd2 = np.float64(pd2)
+        # dust surface density parameters
+        self.Sig0_d = np.float64(Sig0_d)
+        self.R0_d = R0_d * AU
+        self.pd1 = np.float64(pd1)
+        self.pd2 = np.float64(pd2)
 
-    # gas surface density parameters
-    self.Sig0_g = np.float64(Sig0_g)
-    self.R0_g = R0_g * AU
-    self.pg1 = np.float64(pg1)
-    self.pg2 = np.float64(pg2)
+        # gas surface density parameters
+        self.Sig0_g = np.float64(Sig0_g)
+        self.R0_g = R0_g * AU
+        self.pg1 = np.float64(pg1)
+        self.pg2 = np.float64(pg2)
 
-    # thermal structure parameters
-    self.T0_mid = np.float64(T0_mid)
-    self.q_mid = np.float64(q_mid)
-    self.T0_atm = np.float64(T0_atm)
-    self.q_atm = np.float64(q_atm)
-    self.delta = np.float64(delta)
+        # thermal structure parameters
+        self.T0_mid = np.float64(T0_mid)
+        self.q_mid = np.float64(q_mid)
+        self.T0_atm = np.float64(T0_atm)
+        self.q_atm = np.float64(q_atm)
+        self.delta = np.float64(delta)
 
-    # DUST SURFACE DENSITY PROFILE
-    def Sigma_d(self, r):
-        sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
-             np.exp(-(r / self.R0_d)**self.pd2)    
-        return sd
+        # DUST SURFACE DENSITY PROFILE
+        def Sigma_d(self, r):
+            sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
+                 np.exp(-(r / self.R0_d)**self.pd2)    
+            return sd
 
-    # GAS SURFACE DENSITY PROFILE
-    def Sigma_g(self, r):
-        sg = self.Sig0_g * (r / self.R0_g)**(-self.pg1) * \
-             np.exp(-(r / self.R0_g)**self.pg2)
-        return sg
+        # GAS SURFACE DENSITY PROFILE
+        def Sigma_g(self, r):
+            sg = self.Sig0_g * (r / self.R0_g)**(-self.pg1) * \
+                 np.exp(-(r / self.R0_g)**self.pg2)
+            return sg
 
-    # MIDPLANE TEMPERATURE PROFILE
-    def T_mid(self, r):
-        return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
+        # MIDPLANE TEMPERATURE PROFILE
+        def T_mid(self, r):
+            return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
 
-    # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
-    def T_atm(self, r):
-        return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
+        # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
+        def T_atm(self, r):
+            return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
 
-    # PRESSURE SCALE HEIGHTS
-    def Hp(self, r):
-        Omega = np.sqrt(G * self.Mstar / r**3)
-        c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
-        return c_s / Omega
+        # PRESSURE SCALE HEIGHTS
+        def Hp(self, r):
+            Omega = np.sqrt(G * self.Mstar / r**3)
+            c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
+            return c_s / Omega
 
-    # 2-D TEMPERATURE STRUCTURE
-    def Temp(self, r, z):
-        self.z_atm = self.Hp(r) * 4	# fix "atmosphere" to 4 * Hp
-        Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
-               np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
-        if (z > self.z_atm): Trz = self.T_atm(r)
-        return Trz
+        # 2-D TEMPERATURE STRUCTURE
+        def Temp(self, r, z):
+            self.z_atm = self.Hp(r) * 4	    # fix "atmosphere" to 4 * Hp
+            Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
+                   np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
+            if (z > self.z_atm): Trz = self.T_atm(r)
+            return Trz
 
-    # 2-D GAS DENSITY STRUCTURE
-    def rho_g(self, r, z):
+        # VERTICAL TEMPERATURE GRADIENT
+        def logTgrad(self, r, z):
+            dT = (PI * self.delta * z / (self.Temp(r,z) * self.z_atm)) * \
+                 (self.T_mid(r) - self.T_atm(r)) * \
+                 np.sin(PI * z / (2 * self.z_atm)) * \
+                 np.cos(PI * z / (2 * self.z_atm))**(2*self.delta-1)
+            if (z > self.z_atm): dT = 0
+            return dT
+
+        # 2-D GAS DENSITY STRUCTURE
+        def rho_g(self, r, z):
     
-        # first 
+            # first calculate differential form (drho / dz) as function
+            def func(rho, z):
+                a = G * self.M_star * z / (r**2 + z**2)**1.5
+                b = mu_gas * m_H / (kB * self.Temp(r,z))
+                c = self.logTgrad(r,z)
+                return -rho*(a * b + c)
+
+            # set an upper atmosphere boundary
+            z_max = 10 * self.z_atm
+            if (z > z_max): 
+                return 0
+
+            # grid of z values for integration
+            zvals = np.logspace(np.log10(0.1), np.log10(z_max+0.1), 1024) - 0.1
+
+            # numerical integration to get un-normalized density distribution
+            y0 = 10**30
+            rho_init = np.squeeze(odeint(func, y0, zvals))
+
+            # scale factor for normalization
+            rho_norm = self.Sigma_g(r) / (2 * simps(rho_init, zvals))
+
+            # interpolator for moving back onto the spatial grid
+            f = interp1d(zvals, np.squeeze(rho_init))
+
+            # properly normalized gas densities
+            rho_gas = rho_norm * np.float(f(z))
+
+            if (z == 0): 
+                return y0 * rho_norm
+            else:
+                return rho_gas
+
+        # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
+        def nCO(self, r, z):
     
+            rho_gas = self.rho_g(r,z)
+            f_CO = 6 & 10.**(-5)
+
+            return rho_gas * 0.8 * f_CO / (mu_gas * m_H)
 
 
+    # WRITE OUT RADMC FILES
+    def write_Model(self, Grid):
+        
+        # file headers
+        dustdens = open('dust_density.inp', 'w')
+        dustdens.write('1\n%d\n1\n' % Grid.ncells)
+
+        dusttemp = open('dust_temperature.dat', 'w')
+        dusttemp.write('1\n%d\n1\n' % Grid.ncells)
+
+        gasdens = open('numberdens_co.inp', 'w')
+        gasdens.write('1\n%d\n' % Grid.ncells)
+
+        gastemp = open('gas_temperature.inp', 'w')
+        gastemp.write('1\n%d\n' % Grid.ncells)
+
+        # populate files
+        for phi in Grid.phi_centers:
+            for theta in Grid.theta_centers:
+                for r in Grid.r_centers:
+                    r_cyl = r * np.sin(theta)
+                    z = r * np.cos(theta)
+
+                    dusttemp.write('%.6e\n' % self.Temp(r_cyl, z))
+                    gastemp.write('%.6e\n' % self.Temp(r_cyl, z))
+                    dustdens.write('%.6e\n' % self.dust_density(r_cyl, z))
+                    gasdens.write('%.6e\n' % self.nCO(r_cyl, z))
+
+        # close files
+        gastemp.close()
+        gasdens.close()
+        dusttemp.close()
+        dustdens.close()

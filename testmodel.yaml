@@ -1,0 +1,27 @@
+grid:
+   nr: 512 
+   ntheta: 2048 
+   nphi: 32 
+   r_in: 50 
+   r_out: 175 
+
+disk_params:
+    Sigma_d: 0.3 
+    w: 5.5 
+    r_c: 84.5 
+    q_mid: 0.525 
+    T10_mid: 49 
+    dustspec: max1mm
+
+
+stellar_vals: #source-specific values that are fixed 
+    T_eff: 4786 
+    R_star: 0.9 
+    M_star: 1.32 
+    PA: 327.3 
+    incl: 52.7 
+    dpc: 159 
+
+#Number of pixels desired for RADMC3D image
+    npix: 750
+
