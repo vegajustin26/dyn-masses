@@ -1,6 +1,6 @@
 import numpy as np
-import constants as const
-from scipy.integrate import odeint, simps
+import yaml
+from scipy import integrate 
 from scipy.interpolate import interp1d
 
 """
@@ -9,12 +9,12 @@ from scipy.interpolate import interp1d
 """
 
 # shorthand constants
-AU = const.au.cgs
-Msun = const.M_sun.cgs
+AU = 1.49597871e13
+Msun = 1.98847542e33
 mu_gas = 2.37
-m_H = const.m_p.cgs + const.m_e.cgs
-G = const.G.cgs
-kB = const.k_B.cgs
+m_H = 1.67353284e-24
+G = 6.67408e-8
+kB = 1.38064852e-16
 PI = np.pi
 
 
@@ -79,123 +79,131 @@ class Grid:
         f.close()
 
 
-
 class DiskModel:
-    def __init__(self, Mstar, Sig0_d, R0_d, pd1, pd2, 
-                              Sig0_g, R0_g, pg1, pg2, 
-                       T0_mid, q_mid, T0_atm, q_atm, delta):
+    def __init__(self, configfile):
+
+        # open configuration file
+        conf = open(configfile)
+        config = yaml.load(conf)
+        conf.close()
+        disk_params = config["disk_params"]
+        host_params = config["host_params"]
 
         # stellar properties
-        self.Mstar = Mstar * Msun
+        self.Mstar = host_params["M_star"] * Msun
 
         # dust surface density parameters
-        self.Sig0_d = np.float64(Sig0_d)
-        self.R0_d = R0_d * AU
-        self.pd1 = np.float64(pd1)
-        self.pd2 = np.float64(pd2)
+        self.Sig0_d = disk_params["Sig0_d"]
+        self.R0_d = disk_params["R0_d"] * AU
+        self.pd1 = disk_params["pd1"]
+        self.pd2 = disk_params["pd2"]
 
         # gas surface density parameters
-        self.Sig0_g = np.float64(Sig0_g)
-        self.R0_g = R0_g * AU
-        self.pg1 = np.float64(pg1)
-        self.pg2 = np.float64(pg2)
+        self.Sig0_g = disk_params["Sig0_g"]
+        self.R0_g = disk_params["R0_g"] * AU
+        self.pg1 = disk_params["pg1"]
+        self.pg2 = disk_params["pg2"]
 
         # thermal structure parameters
-        self.T0_mid = np.float64(T0_mid)
-        self.q_mid = np.float64(q_mid)
-        self.T0_atm = np.float64(T0_atm)
-        self.q_atm = np.float64(q_atm)
-        self.delta = np.float64(delta)
+        self.T0_mid = disk_params["T0_mid"]
+        self.q_mid = disk_params["q_mid"]
+        self.T0_atm = disk_params["T0_atm"]
+        self.q_atm = disk_params["q_atm"]
+        self.delta = disk_params["delta"]
 
-        # DUST SURFACE DENSITY PROFILE
-        def Sigma_d(self, r):
-            sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
-                 np.exp(-(r / self.R0_d)**self.pd2)    
-            return sd
+    # DUST SURFACE DENSITY PROFILE
+    def Sigma_d(self, r):
+        sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
+             np.exp(-(r / self.R0_d)**self.pd2)    
+        return sd
 
-        # GAS SURFACE DENSITY PROFILE
-        def Sigma_g(self, r):
-            sg = self.Sig0_g * (r / self.R0_g)**(-self.pg1) * \
-                 np.exp(-(r / self.R0_g)**self.pg2)
-            return sg
+    # GAS SURFACE DENSITY PROFILE
+    def Sigma_g(self, r):
+        sg = self.Sig0_g * (r / self.R0_g)**(-self.pg1) * \
+             np.exp(-(r / self.R0_g)**self.pg2)
+        return sg
 
-        # MIDPLANE TEMPERATURE PROFILE
-        def T_mid(self, r):
-            return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
+    # MIDPLANE TEMPERATURE PROFILE
+    def T_mid(self, r):
+        return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
 
-        # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
-        def T_atm(self, r):
-            return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
+    # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
+    def T_atm(self, r):
+        return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
 
-        # PRESSURE SCALE HEIGHTS
-        def Hp(self, r):
-            Omega = np.sqrt(G * self.Mstar / r**3)
-            c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
-            return c_s / Omega
+    # PRESSURE SCALE HEIGHTS
+    def Hp(self, r):
+        Omega = np.sqrt(G * self.Mstar / r**3)
+        c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
+        return c_s / Omega
 
-        # 2-D TEMPERATURE STRUCTURE
-        def Temp(self, r, z):
-            self.z_atm = self.Hp(r) * 4	    # fix "atmosphere" to 4 * Hp
-            Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
-                   np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
-            if (z > self.z_atm): Trz = self.T_atm(r)
-            return Trz
+    # 2-D TEMPERATURE STRUCTURE
+    def Temp(self, r, z):
+        self.z_atm = self.Hp(r) * 4	    # fix "atmosphere" to 4 * Hp
+        Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
+               np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
+        if (z > self.z_atm): Trz = self.T_atm(r)
+        return Trz
 
-        # VERTICAL TEMPERATURE GRADIENT
-        def logTgrad(self, r, z):
-            dT = (PI * self.delta * z / (self.Temp(r,z) * self.z_atm)) * \
-                 (self.T_mid(r) - self.T_atm(r)) * \
-                 np.sin(PI * z / (2 * self.z_atm)) * \
-                 np.cos(PI * z / (2 * self.z_atm))**(2*self.delta-1)
-            if (z > self.z_atm): dT = 0
-            return dT
+    # VERTICAL TEMPERATURE GRADIENT (dlnT / dz)
+    def logTgrad(self, r, z):
+        dT = -2 * self.delta * (self.T_mid(r) - self.T_atm(r)) * \
+             (np.cos(PI * z / (2 * self.z_atm)))**(2*self.delta-1) * \
+             np.sin(PI * z / (2 * self.z_atm)) * PI / (2 * self.z_atm) / \
+             self.Temp(r,z)
+        if (z > self.z_atm): dT = 0
+        return dT
 
-        # 2-D GAS DENSITY STRUCTURE
-        def rho_g(self, r, z):
+
+    # 2-D DUST DENSITY STRUCTURE
+    def rho_d(self, r, z):
+        z_dust = self.Hp(r) * 0.2	# fix dust scale height to lower
+        dnorm = self.Sigma_d(r) / (np.sqrt(2 * PI) * z_dust)
+        return dnorm * np.exp(-0.5 * (z / z_dust)**2)
+
+    # 2-D GAS DENSITY STRUCTURE
+    def rho_g(self, r, z):
     
-            # first calculate differential form (drho / dz) as function
-            def func(rho, z):
-                a = G * self.M_star * z / (r**2 + z**2)**1.5
-                b = mu_gas * m_H / (kB * self.Temp(r,z))
-                c = self.logTgrad(r,z)
-                return -rho*(a * b + c)
+        # set an upper atmosphere boundary
+        z_max = 10 * self.z_atm
 
-            # set an upper atmosphere boundary
-            z_max = 10 * self.z_atm
-            if (z > z_max): 
-                return 0
+        # grid of z values for integration
+        zvals = np.logspace(np.log10(0.1), np.log10(z_max+0.1), 1024) - 0.1
 
-            # grid of z values for integration
-            zvals = np.logspace(np.log10(0.1), np.log10(z_max+0.1), 1024) - 0.1
+        # load temperature gradient
+        dlnTdz = self.logTgrad(r, z)
+ 
+        # density gradient
+        gz = G * self.Mstar * zvals / (r**2 + zvals**2)**1.5
+        dlnpdz = -mu_gas * m_H * gz / (kB * self.Temp(r,z)) - dlnTdz
 
-            # numerical integration to get un-normalized density distribution
-            y0 = 10**30
-            rho_init = np.squeeze(odeint(func, y0, zvals))
+        # numerical integration
+        lnp = integrate.cumtrapz(dlnpdz, zvals, initial=0)
+        dens0 = np.exp(lnp)
 
-            # scale factor for normalization
-            rho_norm = self.Sigma_g(r) / (2 * simps(rho_init, zvals))
+        # normalized densities
+        dens = 0.5 * self.Sigma_g(r) * dens0 / integrate.trapz(dens0, zvals)
+        
+        # interpolator for moving back onto the spatial grid
+        f = interp1d(zvals, np.squeeze(dens), bounds_error=False, 
+                     fill_value=(np.max(dens), 0))
 
-            # interpolator for moving back onto the spatial grid
-            f = interp1d(zvals, np.squeeze(rho_init))
+        # properly normalized gas densities
+        rho_gas = np.float(f(z))
 
-            # properly normalized gas densities
-            rho_gas = rho_norm * np.float(f(z))
+        return rho_gas
+ 
 
-            if (z == 0): 
-                return y0 * rho_norm
-            else:
-                return rho_gas
-
-        # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
-        def nCO(self, r, z):
+    # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
+    def nCO(self, r, z):
     
-            rho_gas = self.rho_g(r,z)
-            f_CO = 6 & 10.**(-5)
+        rho_gas = self.rho_g(r,z)
+        f_CO = 6 * 10.**(-5)
 
-            return rho_gas * 0.8 * f_CO / (mu_gas * m_H)
+        return rho_gas * 0.8 * f_CO / (mu_gas * m_H)
 
 
-    # WRITE OUT RADMC FILES
+        # WRITE OUT RADMC FILES
     def write_Model(self, Grid):
         
         # file headers
@@ -220,7 +228,7 @@ class DiskModel:
 
                     dusttemp.write('%.6e\n' % self.Temp(r_cyl, z))
                     gastemp.write('%.6e\n' % self.Temp(r_cyl, z))
-                    dustdens.write('%.6e\n' % self.dust_density(r_cyl, z))
+                    dustdens.write('%.6e\n' % self.rho_d(r_cyl, z))
                     gasdens.write('%.6e\n' % self.nCO(r_cyl, z))
 
         # close files

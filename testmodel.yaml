@@ -1,20 +1,27 @@
 grid:
-   nr: 512 
-   ntheta: 2048 
-   nphi: 32 
-   r_in: 50 
-   r_out: 175 
+   nr: 128 
+   ntheta: 128 
+   nphi: 1 
+   r_in: 1  
+   r_out: 500 
 
 disk_params:
-    Sigma_d: 0.3 
-    w: 5.5 
-    r_c: 84.5 
-    q_mid: 0.525 
-    T10_mid: 49 
+    Sig0_d: 0.3 
+    R0_d: 50.
+    pd1: 0.5
+    pd2: 2.0
+    Sig0_g: 30.
+    R0_g: 150.
+    pg1: 0.75
+    pg2: 1.5
+    T0_mid: 50.
+    q_mid: 0.5
+    T0_atm: 80.
+    q_atm: 0.5
+    delta: 1.
     dustspec: max1mm
 
-
-stellar_vals: #source-specific values that are fixed 
+host_params: 
     T_eff: 4786 
     R_star: 0.9 
     M_star: 1.32 
