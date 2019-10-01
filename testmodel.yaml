@@ -19,6 +19,7 @@ disk_params:
     T0_atm: 80.
     q_atm: 0.5
     delta: 1.
+    xi: 0.01
     dustspec: max1mm
 
 host_params: 

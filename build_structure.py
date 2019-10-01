@@ -111,11 +111,16 @@ class DiskModel:
         self.q_atm = disk_params["q_atm"]
         self.delta = disk_params["delta"]
 
+        # non-thermal broadening (as fraction of local sound speed)
+        self.xi = disk_params["xi"]
+
+
     # DUST SURFACE DENSITY PROFILE
     def Sigma_d(self, r):
         sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
              np.exp(-(r / self.R0_d)**self.pd2)    
         return sd
+
 
     # GAS SURFACE DENSITY PROFILE
     def Sigma_g(self, r):
@@ -123,19 +128,23 @@ class DiskModel:
              np.exp(-(r / self.R0_g)**self.pg2)
         return sg
 
+
     # MIDPLANE TEMPERATURE PROFILE
     def T_mid(self, r):
         return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
 
+
     # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
     def T_atm(self, r):
         return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
+
 
     # PRESSURE SCALE HEIGHTS
     def Hp(self, r):
         Omega = np.sqrt(G * self.Mstar / r**3)
         c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
         return c_s / Omega
+
 
     # 2-D TEMPERATURE STRUCTURE
     def Temp(self, r, z):
@@ -144,6 +153,7 @@ class DiskModel:
                np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
         if (z > self.z_atm): Trz = self.T_atm(r)
         return Trz
+
 
     # VERTICAL TEMPERATURE GRADIENT (dlnT / dz)
     def logTgrad(self, r, z):
@@ -160,6 +170,7 @@ class DiskModel:
         z_dust = self.Hp(r) * 0.2	# fix dust scale height to lower
         dnorm = self.Sigma_d(r) / (np.sqrt(2 * PI) * z_dust)
         return dnorm * np.exp(-0.5 * (z / z_dust)**2)
+
 
     # 2-D GAS DENSITY STRUCTURE
     def rho_g(self, r, z):
@@ -203,21 +214,47 @@ class DiskModel:
         return rho_gas * 0.8 * f_CO / (mu_gas * m_H)
 
 
-        # WRITE OUT RADMC FILES
+    # GAS VELOCITY STRUCTURE
+    def velocity(self, r):
+    
+        vkep = np.sqrt(G * self.Mstar / r)
+
+        return vkep
+
+
+    # MICROTURBULENCE
+    def vturb(self, r, z):
+
+        c_s = np.sqrt(kB * self.Temp(r, z) / (mu_gas * m_H))
+        dv = self.xi * c_s   
+
+        return dv
+
+
+    # WRITE OUT RADMC FILES
     def write_Model(self, Grid):
         
         # file headers
-        dustdens = open('dust_density.inp', 'w')
-        dustdens.write('1\n%d\n1\n' % Grid.ncells)
+        dustdens_inp = open('dust_density.inp', 'w')
+        dustdens_inp.write('1\n%d\n1\n' % Grid.ncells)
 
-        dusttemp = open('dust_temperature.dat', 'w')
-        dusttemp.write('1\n%d\n1\n' % Grid.ncells)
+        dusttemp_inp = open('dust_temperature.dat', 'w')
+        dusttemp_inp.write('1\n%d\n1\n' % Grid.ncells)
 
-        gasdens = open('numberdens_co.inp', 'w')
-        gasdens.write('1\n%d\n' % Grid.ncells)
+        gasdens_inp = open('gas_density.inp', 'w')
+        gasdens_inp.write('1\n%d\n' % Grid.ncells)
 
-        gastemp = open('gas_temperature.inp', 'w')
-        gastemp.write('1\n%d\n' % Grid.ncells)
+        gastemp_inp = open('gas_temperature.inp', 'w')
+        gastemp_inp.write('1\n%d\n' % Grid.ncells)
+
+        codens_inp = open('numberdens_co.inp', 'w')
+        codens_inp.write('1\n%d\n' % Grid.ncells)
+
+        vel_inp = open('gas_velocity.inp', 'w')
+        vel_inp.write('1\n%d\n' % Grid.ncells)
+
+        turb_inp = open('microturbulence.inp', 'w')
+        turb_inp.write('1\n%d\n' % Grid.ncells)
 
         # populate files
         for phi in Grid.phi_centers:
@@ -226,13 +263,19 @@ class DiskModel:
                     r_cyl = r * np.sin(theta)
                     z = r * np.cos(theta)
 
-                    dusttemp.write('%.6e\n' % self.Temp(r_cyl, z))
-                    gastemp.write('%.6e\n' % self.Temp(r_cyl, z))
-                    dustdens.write('%.6e\n' % self.rho_d(r_cyl, z))
-                    gasdens.write('%.6e\n' % self.nCO(r_cyl, z))
+                    dusttemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
+                    gastemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
+                    dustdens_inp.write('%.6e\n' % self.rho_d(r_cyl, z))
+                    gasdens_inp.write('%.6e\n' % self.rho_g(r_cyl, z))
+                    codens_inp.write('%.6e\n' % self.nCO(r_cyl, z))
+                    vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl))
+                    turb_inp.write('%.6e\n' % self.vturb(r_cyl, z))
 
         # close files
-        gastemp.close()
-        gasdens.close()
-        dusttemp.close()
-        dustdens.close()
+        gastemp_inp.close()
+        gasdens_inp.close()
+        dusttemp_inp.close()
+        dustdens_inp.close()
+        codens_inp.close()
+        vel_inp.close()
+        turb_inp.close()
