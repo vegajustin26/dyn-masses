@@ -24,8 +24,8 @@ class Grid:
         # parameters
         self.nr = nr
         self.ntheta = nt
-        self.nphi = naz
-        self.ncells = self.nr * self.ntheta * self.nphi
+        self.nphi = 1
+        self.ncells = nr * nt * self.nphi
         self.r_in = rin * AU
         self.r_out = rout * AU
 
@@ -67,13 +67,13 @@ class Grid:
         f.write('0\n')	# regular grid
         f.write('100\n')	# spherical coordinate system
         f.write('0\n')	# no grid info written to file (as recommended)
-        f.write('1 1 1\n')	# 
-        f.write('%d %d %d\n' % (self.nr, self.ntheta, self.nphi))
+        f.write('1 1 0\n')	# 
+        f.write('%d %d %d\n' % (nr, nt, self.nphi))
 
         # write wall coordinates to file
         for r in self.r_walls: f.write('%.9e\n' % r)
         for t in self.theta_walls: f.write('%.9e\n' % t)
-        for az in self.phi_walls: f.write('%.9e\n' % az)
+        for phi in self.phi_walls: f.write('%.9e\n' % phi)
 
         # close file
         f.close()
@@ -235,11 +235,11 @@ class DiskModel:
     def write_Model(self, Grid):
         
         # file headers
-        dustdens_inp = open('dust_density.inp', 'w')
-        dustdens_inp.write('1\n%d\n1\n' % Grid.ncells)
+        #dustdens_inp = open('dust_density.inp', 'w')
+        #dustdens_inp.write('1\n%d\n1\n' % Grid.ncells)
 
-        dusttemp_inp = open('dust_temperature.dat', 'w')
-        dusttemp_inp.write('1\n%d\n1\n' % Grid.ncells)
+        #dusttemp_inp = open('dust_temperature.dat', 'w')
+        #dusttemp_inp.write('1\n%d\n1\n' % Grid.ncells)
 
         gasdens_inp = open('gas_density.inp', 'w')
         gasdens_inp.write('1\n%d\n' % Grid.ncells)
@@ -263,9 +263,9 @@ class DiskModel:
                     r_cyl = r * np.sin(theta)
                     z = r * np.cos(theta)
 
-                    dusttemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
+        #            dusttemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
                     gastemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
-                    dustdens_inp.write('%.6e\n' % self.rho_d(r_cyl, z))
+        #            dustdens_inp.write('%.6e\n' % self.rho_d(r_cyl, z))
                     gasdens_inp.write('%.6e\n' % self.rho_g(r_cyl, z))
                     codens_inp.write('%.6e\n' % self.nCO(r_cyl, z))
                     vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl))
@@ -274,8 +274,8 @@ class DiskModel:
         # close files
         gastemp_inp.close()
         gasdens_inp.close()
-        dusttemp_inp.close()
-        dustdens_inp.close()
+        #dusttemp_inp.close()
+        #dustdens_inp.close()
         codens_inp.close()
         vel_inp.close()
         turb_inp.close()

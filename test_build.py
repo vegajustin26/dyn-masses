@@ -4,7 +4,7 @@ import os
 import yaml
 import build_structure as model
 import matplotlib.pyplot as plt
-
+from fitsconversion import convert_to_fits
 
 def print_radmc_inp(incl_dust=0, incl_lines=1, incl_freefree=0, 
                     scattering='Isotropic', binary=False, 
@@ -61,8 +61,17 @@ grid = model.Grid(nr, ntheta, nphi, r_in, r_out)
 
 # create a model structure and write the RADMC3D input files
 diskmodel = model.DiskModel(setup_file)
+print_radmc_inp(incl_dust = 0, incl_lines = 1)
 diskmodel.write_Model(grid)
 
+
+# make a set of channel maps
+incl, PA, npix = 50., 320., 750.
+#os.system('radmc3d image iline 2 widthkms 2.0 linenlam 10 incl %.2f posang %.2f npix %d setthreads 4' % (incl, PA, npix))
+
+os.system('rm -rf image.out')
+os.system('radmc3d image incl 50 posang 30 npix 750 iline 2 imolspec 1 widthkms 2.0 vkms 0.0 linenlam 15 setthreads 4')
+convert_to_fits('image.out', 'test.fits', 140., RA=165.5, DEC=-34.7, tau=False)
 
 AU = 1.49597871e13
 Msun = 1.98847542e33
@@ -71,5 +80,4 @@ m_H = 1.67353284e-24
 G = 6.67408e-8
 kB = 1.38064852e-16
 PI = np.pi
-
 
