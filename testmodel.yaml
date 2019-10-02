@@ -1,9 +1,20 @@
 grid:
-   nr: 128 
-   ntheta: 128 
-   nphi: 1 
-   r_in: 1  
-   r_out: 500 
+    nr: 128 
+    ntheta: 128 
+    nphi: 1 
+    r_in: 1  
+    r_out: 500 
+
+setup:
+    incl_dust: 0
+    incl_lines: 1
+    incl_freefree: 0
+    scattering: 'Isotropic'
+    binary: False
+    camera_tracemode: 'image'
+    lines_mode: 'LTE'
+    molecule: 'co'
+    transition: 2
 
 disk_params:
     Sig0_d: 0.3 
@@ -26,10 +37,13 @@ host_params:
     T_eff: 4786 
     R_star: 0.9 
     M_star: 1.32 
+
+outputs:
     PA: 327.3 
     incl: 52.7 
     dpc: 159 
-
-#Number of pixels desired for RADMC3D image
+    widthkms: 2.0
+    nchan: 15
     npix: 750
-
+    RA: 165.5
+    DEC: -34.7
