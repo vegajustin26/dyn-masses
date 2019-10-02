@@ -40,6 +40,7 @@ os.system("radmc3d image incl %.2f posang %.2f " % \
 
 
 # make a FITS file
-convert_to_fits('image.out', modelname+'_'+pars["setup"]["molecule"]+'.fits', 
-                pars["outputs"]["dpc"], RA=pars["outputs"]["RA"], 
-                DEC=pars["outputs"]["DEC"], tau=False)
+outfile = modelname+'_'+pars["setup"]["molecule"]+'.fits'
+os.system('rm '+outfile)
+convert_to_fits('image.out', outfile, pars["outputs"]["dpc"], 
+                RA=pars["outputs"]["RA"], DEC=pars["outputs"]["DEC"])
