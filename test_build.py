@@ -5,10 +5,11 @@ import yaml
 import build_structure as model
 import matplotlib.pyplot as plt
 from fitsconversion import convert_to_fits
+from look_utils import read_Tgas, read_nmol
 
 
 # parameter file and bookkeeping setup
-modelname = 'testmodel'
+modelname = 'testabund'
 if not os.path.exists(modelname):
     os.makedirs(modelname)
 
@@ -26,6 +27,32 @@ diskmodel.write_Model(grid)
 conf = open(modelname+'.yaml')
 pars = yaml.load(conf)
 conf.close()
+
+
+# look at the gas temperature structure
+Tgas = read_Tgas(grid, fname=modelname+'/gas_temperature.inp')
+levs = np.linspace(5, 100, 24)
+plt.contour(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, Tgas,
+            levs, colors='k')
+plt.contourf(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, Tgas,
+             levs)
+plt.xscale('log')
+plt.show()
+
+# look at the gas temperature structure
+lognco = np.log10(read_nmol(grid, fname=modelname+'/numberdens_co.inp'))
+levs = np.linspace(-8, 12, 24)
+
+contours = plt.contour(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, 
+                       lognco, levs, colors='k')
+plt.clabel(contours, colors = 'k', fmt = '%2.1f', fontsize=12)
+plt.contourf(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, lognco,
+             levs)
+plt.xscale('log')
+plt.show()
+
+
+sys.exit()
 
 
 # raytracing

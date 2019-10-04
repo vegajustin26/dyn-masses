@@ -25,6 +25,11 @@ disk_params:
     R0_g: 150.
     pg1: 0.75
     pg2: 1.5
+    sig_pdr: 5e20
+    depl_pdr: 0.01
+    T_frz: 19.
+    depl_frz: 0.01
+    fmol: 6e-5
     T0_mid: 50.
     q_mid: 0.5
     T0_atm: 80.

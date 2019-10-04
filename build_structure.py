@@ -10,6 +10,8 @@ AU = 1.49597871e13
 Msun = 1.98847542e33
 mu_gas = 2.37
 m_H = 1.67353284e-24
+f_H = 0.706
+f_H2 = 0.8
 G = 6.67408e-8
 kB = 1.38064852e-16
 PI = np.pi
@@ -155,6 +157,7 @@ class DiskModel:
         host_params = config["host_params"]
         self.do_dust = config["setup"]["incl_dust"]
         self.do_gas = config["setup"]["incl_lines"]
+        self.molecule = config["setup"]["molecule"]
 
         # stellar properties
         self.Mstar = host_params["M_star"] * Msun
@@ -170,6 +173,11 @@ class DiskModel:
         self.R0_g = disk_params["R0_g"] * AU
         self.pg1 = disk_params["pg1"]
         self.pg2 = disk_params["pg2"]
+        self.sigma_pdr = 10.**(disk_params["sig_pdr"])
+        self.depl_pdr = disk_params["depl_pdr"]
+        self.T_frz = disk_params["T_frz"]
+        self.depl_frz = disk_params["depl_frz"]
+        self.fmol = 10.**(disk_params["fmol"])
 
         # thermal structure parameters
         self.T0_mid = disk_params["T0_mid"]
@@ -244,6 +252,7 @@ class DiskModel:
     
         # set an upper atmosphere boundary
         z_max = 10 * self.z_atm
+        PDR = False
 
         # grid of z values for integration
         zvals = np.logspace(np.log10(0.1), np.log10(z_max+0.1), 1024) - 0.1
@@ -269,16 +278,33 @@ class DiskModel:
         # properly normalized gas densities
         rho_gas = np.float(f(z))
 
-        return rho_gas
+        ## boolean indicator if this height is in the molecule's PDR
+        # find index of nearest zvals cell
+        index = np.argmin(np.abs(zvals-z))	
+        # integrate the vertical density profile down to that height
+        sig_index = integrate.trapz(dens[index:], zvals[index:])
+        # criterion for photodissociation
+        if (sig_index < (self.sigma_pdr * mu_gas * m_H * f_H)): 
+            PDR = True
+
+        return rho_gas, PDR
  
 
     # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
-    def nCO(self, r, z):
+    def nmol(self, r, z):
     
-        rho_gas = self.rho_g(r,z)
-        f_CO = 6 * 10.**(-5)
+        # read in gas volume densities
+        rho_gas, PDR = self.rho_g(r,z)
 
-        return rho_gas * 0.8 * f_CO / (mu_gas * m_H)
+        # abundance variations
+#        if (self.Temp(r,z) < self.T_frz): 
+#            Xmol = self.depl_frz * self.fmol
+#        elif PDR: 
+#            Xmol = self.depl_pdr * self.fmol
+#        else: 
+        Xmol = self.fmol
+
+        return rho_gas * f_H2 * Xmol / (mu_gas * m_H)
 
 
     # GAS VELOCITY STRUCTURE
@@ -316,8 +342,8 @@ class DiskModel:
             gastemp_inp = open(self.mdir+'gas_temperature.inp', 'w')
             gastemp_inp.write('1\n%d\n' % Grid.ncells)
 
-            codens_inp = open(self.mdir+'numberdens_co.inp', 'w')
-            codens_inp.write('1\n%d\n' % Grid.ncells)
+            nmol_inp = open(self.mdir+'numberdens_'+self.molecule+'.inp', 'w')
+            nmol_inp.write('1\n%d\n' % Grid.ncells)
 
             vel_inp = open(self.mdir+'gas_velocity.inp', 'w')
             vel_inp.write('1\n%d\n' % Grid.ncells)
@@ -338,8 +364,9 @@ class DiskModel:
 
                     if (self.do_gas == 1):
                         gastemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
-                        gasdens_inp.write('%.6e\n' % self.rho_g(r_cyl, z))
-                        codens_inp.write('%.6e\n' % self.nCO(r_cyl, z))
+                        gasdens, dum = self.rho_g(r_cyl, z)
+                        gasdens_inp.write('%.6e\n' % gasdens)
+                        nmol_inp.write('%.6e\n' % self.nmol(r_cyl, z))
                         vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl))
                         turb_inp.write('%.6e\n' % self.vturb(r_cyl, z))
 
@@ -350,6 +377,6 @@ class DiskModel:
         if (self.do_gas == 1):
             gastemp_inp.close()
             gasdens_inp.close()
-            codens_inp.close()
+            nmol_inp.close()
             vel_inp.close()
             turb_inp.close()
