@@ -30,14 +30,17 @@ conf.close()
 
 
 # look at the gas temperature structure
-Tgas = read_Tgas(grid, fname=modelname+'/gas_temperature.inp')
+AU = 1.496e13
+Tgas = (read_Tgas(grid, fname=modelname+'/gas_temperature.inp'))
 levs = np.linspace(5, 100, 24)
-plt.contour(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, Tgas,
-            levs, colors='k')
-plt.contourf(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, Tgas,
-             levs)
-plt.xscale('log')
+#plt.contour(grid.r_centers/1.496e13, 0.5*np.pi-grid.theta_centers, Tgas,
+#            levs, colors='k')
+plt.contourf(0.5*np.pi-grid.theta_centers, grid.r_centers/AU, Tgas, levs)
+plt.yscale('log')
 plt.show()
+
+
+sys.exit()
 
 # look at the gas temperature structure
 lognco = np.log10(read_nmol(grid, fname=modelname+'/numberdens_co.inp'))

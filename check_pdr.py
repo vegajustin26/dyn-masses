@@ -17,7 +17,7 @@ abund_grid = model.Grid('testabund')
 abund_nco = read_nmol(abund_grid, fname='testabund/numberdens_co.inp')
 abund_zr = 0.5*np.pi - abund_grid.theta_centers
 
-index = 90
+index = 30
 print(abund_grid.r_centers[index]/1.496e13)
 
 plt.semilogy(simple_zr, simple_nco[index, :], 'C0')
