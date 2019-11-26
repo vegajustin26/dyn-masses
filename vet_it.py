@@ -9,12 +9,11 @@ import os
 # generate the spherical coordinate grid and associated control files
 sim_grid = grid('testrich', writegrid=True)
 
-
-
+# generate a structure model on a cylindrical grid
+sim_disk = disk('testrich')
 
 
 sys.exit()
-temp = disk('testrich')
 
 
 _ = temp.plot_rotation(contourf_kwargs=dict(levels=np.arange(0, 10, .1)))
