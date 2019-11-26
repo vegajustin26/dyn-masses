@@ -12,6 +12,8 @@ sim_grid = grid('testrich', writegrid=True)
 # generate a structure model on a cylindrical grid
 sim_disk = disk('testrich')
 
+Hp = sim_disk.Hp
+r = sim_disk.rvals
 
 sys.exit()
 

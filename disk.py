@@ -27,15 +27,16 @@ class disk:
     """
 
     # constants
-    msun = 1.989e33  # stellar mass [g]
+    msun = 1.989e33  
     AU = sc.au * 1e2 
-    mu = 2.37  # mean molecular weight [m_p]
+    mu = 2.37  
     m_p = sc.m_p * 1e3
-    kB = sc.k * 1e5
+    kB = sc.k * 1e7
     G = sc.G * 1e3
 
-    min_dens = 1e3  # minimum gas density in [H2/ccm]
-    max_dens = 1e20  # maximum gas density in [H2/ccm]
+    # fixed values
+    min_dens = 1e3  # minimum gas density in [H2/cm**3]
+    max_dens = 1e20  # maximum gas density in [H2/cm**3]
     min_temp = 5e0  # minimum temperature in [K]
     max_temp = 5e2  # maximum temperature in [K]
 
