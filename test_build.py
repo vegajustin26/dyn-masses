@@ -5,11 +5,11 @@ import yaml
 import build_structure as model
 import matplotlib.pyplot as plt
 from fitsconversion import convert_to_fits
-from look_utils import read_Tgas, read_nmol
+#from look_utils import read_Tgas, read_nmol
 
 
 # parameter file and bookkeeping setup
-modelname = 'testabund'
+modelname = 'testrich'
 if not os.path.exists(modelname):
     os.makedirs(modelname)
 
@@ -21,6 +21,10 @@ grid = model.Grid(modelname)
 # build a model structure 
 diskmodel = model.DiskModel(modelname)
 diskmodel.write_Model(grid)
+
+
+# STOP POINT
+sys.exit()
 
 
 # extract additional parameters for synthetic observations
