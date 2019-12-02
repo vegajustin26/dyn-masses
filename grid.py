@@ -19,6 +19,7 @@ class grid:
     
     Args:
         modelname (str): Name of the model with parameters in modelname.yaml.
+	writegrid (bool): Write out the grid into RADMC3D formats.
     """
 
     def __init__(self, modelname, writegrid=False):

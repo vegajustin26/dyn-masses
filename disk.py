@@ -8,11 +8,13 @@ TODO:
     - Check on hard-coded grid (problematic for interpolation?).
 """
 
+import os
+import sys
 import yaml
 import numpy as np
 import scipy.constants as sc
 import matplotlib.pyplot as plt
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumtrapz, trapz
 from matplotlib.ticker import MultipleLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -24,6 +26,7 @@ class disk:
 
     Args:
         modelname (str): Name of the model with parameters in modelname.yaml.
+        writestruct (bool): Write out the structure into RADMC3D formats
     """
 
     # constants
@@ -41,7 +44,7 @@ class disk:
     max_temp = 5e2  # maximum temperature in [K]
 
 
-    def __init__(self, modelname):
+    def __init__(self, modelname, writestruct=False, plotstruct=True):
         # load grid parameters from model file (modelname.yaml)
         conf = open(modelname + ".yaml")
         config = yaml.load(conf, Loader=yaml.FullLoader)
@@ -94,12 +97,28 @@ class disk:
         assert self.abundance.shape == self.temperature.shape
 
 
-        # calculate the rotational velocities
+        # calculate the velocity structure
         self.vphi = self._parse_function("rotation", 
                                          self.disk_params["rotation"])
 
         print("Disk model successfully populated.")
 
+
+        # write the plots to file (unless declined)
+        self.model_dir = modelname + '/'
+        if plotstruct:
+            if not os.path.exists(self.model_dir):
+                print("Generating new model directory: " + self.model_dir)
+                os.mkdir(self.model_dir)
+
+            # plot density structure
+            _ = self.plot_density(full=False)
+            _.savefig(self.model_dir+'density.png')
+
+            # plot velocity field
+            _ = self.plot_rotation(contourf_kwargs = \
+                                   dict(levels=np.arange(0, 10, .1)))
+            _.savefig(self.model_dir+'velocity.png')
 
 
     # Gridding functions.
@@ -119,7 +138,7 @@ class disk:
             self.rvals = np.linspace(self.rmin, self.rmax, self.nr)
 
         # vertical grid in AU
-        self.nz = int(params.pop("nr", 150))
+        self.nz = int(params.pop("nz", 150))
         self.logz = params.pop("logz", True)
         self.zmin = params.pop("zmin", -1.0)
         self.zmax = params.pop("zmax", 1.0)
@@ -133,7 +152,7 @@ class disk:
         # 2-D grid, and in spherical polar coordinates (in AU, radians)
         self.rpnts, self.zpnts = np.meshgrid(self.rvals, self.zvals)
         self.polar_r = np.hypot(self.rpnts, self.zpnts)
-        self.polar_t = np.arctan2(self.zpnts, self.rpnts)
+        self.polar_t = np.arctan2(self.rpnts, self.zpnts)
 
         # convert (r, z) into CGS units (cm)
         self.rpnts_cm = self.rpnts * self.AU
@@ -218,25 +237,34 @@ class disk:
 
     def _density_isothermal(self, **args):
         """ Vertically isothermal gas density structure in [g/cm**3] """
-        dens = self.sigma_g / (self.scaleheight() * self.AU) / np.sqrt(2*np.pi) 
-        sdev = np.sqrt(2.0) * self.scaleheight()
-        return self.gaussian(self.zpnts, 0.0, sdev, dens)
+        dens = self.sigma_g / (self.scaleheight() * self.AU * np.sqrt(2*np.pi)) 
+        dens *= np.exp(-0.5 * (self.zpnts / self.scaleheight())**2)
+        return dens	
 
 
     def _density_hydrostatic(self, **args):
         """ Hydrostatic gas density structure in [g/cm**3] """
+        # temperature gradient (d ln T / dz)
         dT = np.diff(np.log(self.temperature), axis=0)
         dT = np.vstack((dT, dT[-1]))
         dz = np.diff(self.zpnts_cm, axis=0)
         dz = np.vstack((dz, dz[-1]))
-        drho = dz / self.soundspeed()**2
-        drho *= self.G * self.mstar * self.zpnts_cm
-        drho /= np.hypot(self.rpnts_cm, self.zpnts_cm)**3
-        rho = np.ones(self.temperature.shape)
-        for i in range(self.rvals.size):
-            for j in range(1, self.zvals.size):
-                rho[j,i] = np.exp(np.log(max(rho[j-1,i], 1e-100)) - drho[j,i])
-        rho *= self.sigma_g[None, :] / np.trapz(rho, self.zvals_cm, axis=0)
+        dlnTdz = dT / dz
+
+        # gravity term ( G M z / (cs**2 * (r**2 + z**2)**3/2) )
+        gz = self.G * self.mstar * self.zpnts_cm / self.soundspeed()**2 
+        gz /= np.hypot(self.rpnts_cm, self.zpnts_cm)**3
+
+        # density gradient (d ln rho / dz)
+        dlnpdz = -dlnTdz - gz
+
+        # numerical integration to get (unnormalized) densities
+        lnp = cumtrapz(dlnpdz, self.zpnts_cm, initial=0, axis=0)
+        dens = np.exp(lnp)
+        
+        # normalize
+        rho = dens * 0.5 * self.sigma_g / trapz(dens, self.zpnts_cm, axis=0)
+
         return rho
 
 
