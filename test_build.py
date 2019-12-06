@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import os
 import yaml
+import time
 import build_structure as model
 import matplotlib.pyplot as plt
 from fitsconversion import convert_to_fits
@@ -9,7 +10,7 @@ from fitsconversion import convert_to_fits
 
 
 # parameter file and bookkeeping setup
-modelname = 'testrich'
+modelname = 'testmodel_me'
 if not os.path.exists(modelname):
     os.makedirs(modelname)
 
@@ -19,8 +20,11 @@ grid = model.Grid(modelname)
 
 
 # build a model structure 
+t0 = time.time()
 diskmodel = model.DiskModel(modelname)
 diskmodel.write_Model(grid)
+tme = time.time()
+print((tme-t0)/60.)
 
 
 # STOP POINT

@@ -26,7 +26,7 @@ class Grid:
 
         # open configuration file
         conf = open(modelname+'.yaml')
-        config = yaml.load(conf)
+        config = yaml.load(conf, Loader=yaml.FullLoader)
         conf.close()
         mdir = modelname+'/'
         grid_params = config["grid"]
@@ -150,7 +150,7 @@ class DiskModel:
 
         # open configuration file
         conf = open(modelname+'.yaml')
-        config = yaml.load(conf)
+        config = yaml.load(conf, Loader=yaml.FullLoader)
         conf.close()
         self.mdir = modelname+'/'
         disk_params = config["disk_params"]
@@ -206,12 +206,12 @@ class DiskModel:
 
     # MIDPLANE TEMPERATURE PROFILE
     def T_mid(self, r):
-        return self.T0_mid * (r / (10.*AU))**(-self.q_mid)
+        return self.T0_mid * (r / (30.*AU))**(-self.q_mid)
 
 
     # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
     def T_atm(self, r):
-        return self.T0_atm * (r / (10.*AU))**(-self.q_atm)
+        return self.T0_atm * (r / (30.*AU))**(-self.q_atm)
 
 
     # PRESSURE SCALE HEIGHTS
