@@ -58,7 +58,11 @@ class disk:
         self.temp_args = self.disk_params["temperature"]["arguments"]
 
         self.rhog = np.zeros_like(self.rcyl)
-        self.rhog_args = self.disk_params["gas_surface_density"]["arguments"]
+        rho_args = self.disk_params["gas_surface_density"]["arguments"]
+        nmol_args = self.disk_params["abundance"]["arguments"]
+        self.dens_args = {**rho_args, **self.temp_args, **nmol_args}
+
+        self.nmol = np.zeros_like(self.rcyl)
 
 
         # structure loop
@@ -72,8 +76,10 @@ class disk:
                 # temperature
                 self.temperature[j,i] = self.Temp(r, z, **self.temp_args)
 
-                # gas density
-                self.rhog[j,i] = self.Density(r, z, **self.rhog_args)
+                # gas density and number density (of given molecule)
+                self.rhog[j,i], self.nmol[j,i] = self.Density_g(r, z, 
+                                                     **self.dens_args)
+
 
 
 
@@ -85,6 +91,10 @@ class disk:
 
         _ = self.plot_dens(full=False)
         _.savefig('test_dens.png')
+
+
+        _ = self.plot_nmol(full=False)
+        _.savefig('test_nmol.png')
 
 
 
@@ -102,14 +112,14 @@ class disk:
         # Dartois et al. 2003 (type II)
         if self.disk_params["temperature"]["type"] == 'dartois':
             try:
-                r0, T0mid = args["r0"] * self.AU, args["T0mid"]
+                r0, T0mid = args["rT0"] * self.AU, args["T0mid"]
                 T0atm = args.pop("T0atm", T0mid)
                 Tqmid = args["Tqmid"]
                 Tqatm = args.pop("Tqatm", Tqmid)
                 delta = args.pop("delta", 2.0)
                 ZqHp = args.pop("ZqHp", 4.0)
             except KeyError:
-                raise ValueError("Specify at least `r0`, `T0mid`, `Tqmid`.")
+                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
             Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
             Tatm = self.powerlaw(r, T0atm, Tqatm, r0)
             zatm = ZqHp * self.scaleheight(r, T=Tmid)
@@ -124,10 +134,10 @@ class disk:
         # vertically isothermal
         if self.disk_params["temperature"]["type"] == 'isothermal':
             try:
-                r0, T0mid = args["r0"], args["T0mid"]
+                r0, T0mid = args["rT0"], args["T0mid"]
                 Tqmid = args["Tqmid"]
             except KeyError:
-                raise ValueError("Specify at least `r0`, `T0mid`, `Tqmid`.")
+                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
             return self.powerlaw(r, T0mid, Tqmid, r0)
 
 
@@ -149,14 +159,14 @@ class disk:
         # Dartois et al. 2003 (type II)
         if self.disk_params["temperature"]["type"] == 'dartois':
             try:
-                r0, T0mid = args["r0"] * self.AU, args["T0mid"]
+                r0, T0mid = args["rT0"] * self.AU, args["T0mid"]
                 T0atm = args.pop("T0atm", T0mid)
                 Tqmid = args["Tqmid"]
                 Tqatm = args.pop("Tqatm", Tqmid)
                 delta = args.pop("delta", 2.0)
                 ZqHp = args.pop("ZqHp", 4.0)
             except KeyError:
-                raise ValueError("Specify at least `r0`, `T0mid`, `Tqmid`.")
+                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
             Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
             Tatm = self.powerlaw(r, T0atm, Tqatm, r0)
             zatm = ZqHp * self.scaleheight(r, T=Tmid)
@@ -182,32 +192,35 @@ class disk:
         # similarity solution
         if self.disk_params["gas_surface_density"]["type"] == 'self_similar':
             try:
-                r0, sig0, pg1 = args["r0"] * self.AU, args["sig0"], args["pg1"]
+                Rc, sig0, pg1 = args["Rc"] * self.AU, args["sig0"], args["pg1"]
                 pg2 = args.pop("pg2", 2.0 - pg1)
             except KeyError:
-                raise ValueError("Specify at least `r0`, `sig0`, `pg1`.")
-            return self.powerlaw(r, sig0, -pg1, r0) * np.exp(-(r / r0)**pg2)
+                raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
+            return self.powerlaw(r, sig0, -pg1, Rc) * np.exp(-(r / Rc)**pg2)
 
         # power-law
         if self.disk_params["gas_surface_density"]["type"] == 'powerlaw':
             try:
-                r0, sig0, pg1 = args["r0"] * self.AU, args["sig0"], args["pg1"]
+                redge, sig0 = args["redge"] * self.AU, args["sig0"]
+                pg1 = args["pg1"]
             except KeyError:
-                raise ValueError("Specify `r0`, `sig0`, `pg1`.")
-            return self.powerlaw(self.rvals, sig0, -pg1, r0)
+                raise ValueError("Specify `redge`, `sig0`, `pg1`.")
+            return self.powerlaw(self.rvals, sig0, -pg1, redge)
 
 
-    def Density(self, r, z, **args):
+    def Density_g(self, r, z, **args):
+
+        """ Gas densities """
 
         # define a special z grid for integration (zg)
         zmin, zmax, nz = 0.1, 5.*r, 1024
         zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz) - zmin
 
         # vertical temperature profile
-        Tz = self.Temp(r, zg, **self.temp_args)
+        Tz = self.Temp(r, zg, **args)
 
         # vertical temperature gradient
-        dlnTdz = self.Tgrad_z(r, zg, **self.temp_args)
+        dlnTdz = self.Tgrad_z(r, zg, **args)
                 
         # vertical gravity
         gz = self.G * self.mstar * zg / (self.soundspeed(T=Tz))**2
@@ -221,13 +234,70 @@ class disk:
         rho0 = np.exp(lnp)
 
         # normalize
-        rho = 0.5 * self.Sigma_g(r, **args) * rho0 / integrate.trapz(rho0, zg)
+        rho = 0.5 * self.Sigma_g(r, **args) * \
+              rho0 / integrate.trapz(rho0, zg)
 
         # set up an interpolator for going back to the original gridpoint
         f = interp1d(zg, rho, bounds_error=False, fill_value=(np.max(rho, 0)))
 
-        # interpolate back to original z
-        return f(z)
+        # gas density at specified height
+        rhoz = f(z)
+
+
+        """ Molecular (number) densities """
+
+        try:
+            xmol = args["xmol"]
+        except KeyError:
+            print("Specify at least `xmol`.")
+
+        # 'chemical' setup, with constant abundance in a layer between the 
+        # freezeout temperature and photodissociation column
+        if self.disk_params["abundance"]["type"] == 'chemical':
+
+            # find the index of the nearest z cell
+            index = np.argmin(np.abs(zg-z))
+
+            # integrate the vertical density profile *down* to that height
+            sig_index = integrate.trapz(rho[index:], zg[index:])
+            NH2_index = sig_index / self.m_p / self.mu
+
+            # note the column density for photodissociation
+            Npd = 10.**(args.pop("logNpd", 21.11))
+
+            # note the freezeout temperature
+            Tfreeze = args.pop("tfreeze", 21.0)
+
+            # compute abundance
+            if ((NH2_index >= Npd) & 
+                (self.Temp(r, z, **self.temp_args) >= Tfreeze)):
+                abund = xmol
+            else: abund = xmol * args.pop("depletion", 1e-8)
+
+        # 'layer' setup, with constant abundance in a layer between specified
+        # radial and height (z / r) bounds
+        if self.disk_params["abundance"]["type"] == 'layer':
+
+            # identify the layer heights
+            zrmin = args.pop("zrmin", 0.0)
+            zrmax = args.pop("zrmax", 1.0)
+
+            # identify the layer radii
+            rmin = args.pop("rmin", self.rcyl.min()) * self.AU
+            rmax = args.pop("rmax", self.rcyl.max()) * self.AU
+
+            # compute abundance
+            if ((r > rmin) & (r <= rmax) & (z/r > zrmin) & (z/r <= zrmax)):
+                abund = xmol
+            else: abund = xmol * args.pop("depletion", 1e-8)
+
+        # molecular number density
+        nmol = rhoz * abund / self.m_p / self.mu
+
+
+        return rhoz, nmol
+
+            
 
 
         
@@ -270,7 +340,7 @@ class disk:
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
         levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 500, 50)
+        levels = np.linspace(3, 300, 50)
         levels = contourf_kwargs.pop("levels", levels)
         cmap = contourf_kwargs.pop("cmap", "plasma")
         im = ax.contourf(R, yaxis, toplot, levels=levels,
@@ -279,7 +349,7 @@ class disk:
         cax = make_axes_locatable(ax)
         cax = cax.append_axes("right", size="4.5%" if full else "3%",
                               pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 500, 50))
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 300, 50))
         cb.set_label(r"$T\,\,[{\rm K}]$", rotation=270, labelpad=15)
 
         self._gentrify_structure_ax(ax, full=full)
@@ -292,7 +362,6 @@ class disk:
         THETA = 0.5*np.pi - self.tvals[::-1]
         RHO = self.rhog[::-1]
         toplot = np.vstack([RHO[::-1], RHO])
-        print(toplot)
         toplot = np.log10(toplot / (sc.m_p*1e3) / 2.37)
         yaxis = np.concatenate([-THETA[::-1], THETA])
 
@@ -312,6 +381,34 @@ class disk:
                      rotation=270, labelpad=15)
         self._gentrify_structure_ax(ax, full=full)
         return fig
+
+
+    def plot_nmol(self, fig=None, contourf_kwargs=None, full=True):
+        fig, ax = self._grab_axes(fig)
+        R = self.rvals / self.AU
+        THETA = 0.5*np.pi - self.tvals[::-1]
+        NMOL = self.nmol[::-1]
+        toplot = np.vstack([NMOL[::-1], NMOL])
+        toplot = np.log10(toplot)
+        yaxis = np.concatenate([-THETA[::-1], THETA])
+
+        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
+        levels = np.linspace(toplot.min(), toplot.max(), 50)
+        levels = np.linspace(-12, 12, 50)
+        levels = contourf_kwargs.pop("levels", levels)
+        cmap = contourf_kwargs.pop("cmap", "afmhot_r")
+        im = ax.contourf(R, yaxis, toplot, levels=levels,
+                         cmap=cmap, **contourf_kwargs)
+
+        cax = make_axes_locatable(ax)
+        cax = cax.append_axes("right", size="4.5%" if full else "3%",
+                              pad="2.25%" if full else "1.5%")
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
+        cb.set_label(r"$\log_{10}(n_{\rm CO}\,\,[{\rm cm^{-2}}])$",
+                     rotation=270, labelpad=15)
+        self._gentrify_structure_ax(ax, full=full)
+        return fig
+
 
 
 
