@@ -36,6 +36,7 @@ class disk:
         config = yaml.load(conf, Loader=yaml.FullLoader)
         self.host_params = config["host_params"]
         self.disk_params = config["disk_params"]
+        self.setups = config["setup"]
         conf.close()
 
 
@@ -70,6 +71,20 @@ class disk:
         self.turb = np.zeros_like(self.rcyl)
         self.turb_args = self.disk_params["turbulence"]["arguments"]
 
+        # generate RADMC3D files and write header information
+        if writestruct:
+            # file headers
+            rhog_inp = open(modelname+'/gas_density.inp', 'w')
+            rhog_inp.write('1\n%d\n' % (self.nr * self.nt))
+            temp_inp = open(modelname+'/gas_temperature.inp', 'w')
+            temp_inp.write('1\n%d\n' % (self.nr * self.nt))
+            mname = self.setups["molecule"]
+            nmol_inp = open(modelname+'/numberdens_'+mname+'.inp', 'w')
+            nmol_inp.write('1\n%d\n' % (self.nr * self.nt))
+            vel_inp = open(modelname+'/gas_velocity.inp', 'w')
+            vel_inp.write('1\n%d\n' % (self.nr * self.nt))
+            turb_inp = open(modelname+'/microturbulence.inp', 'w')
+            turb_inp.write('1\n%d\n' % (self.nr * self.nt))
 
         # structure (and output) loop
         for j in range(len(self.tvals)):
@@ -93,6 +108,23 @@ class disk:
                 self.turb[j,i] = self.vturb(r, z, **self.turb_args)
 
 
+                # write into structure files
+                if writestruct:
+                    temp_inp.write('%.6e\n' % self.temperature[j,i])
+                    rhog_inp.write('%.6e\n' % self.rhog[j,i])
+                    nmol_inp.write('%.6e\n' % self.nmol[j,i])
+                    vel_inp.write('0 0 %.6e\n' % self.vel[j,i])
+                    turb_inp.write('%.6e\n' % self.turb[j,i])
+
+
+        # close structure files                
+        if writestruct:
+            temp_inp.close()
+            rhog_inp.close()
+            nmol_inp.close()
+            vel_inp.close()
+            turb_inp.close()
+
 
 
         # temporary plotter!
@@ -106,6 +138,11 @@ class disk:
 
         _ = self.plot_nmol(full=False)
         _.savefig('test_nmol.png')
+
+
+        _ = self.plot_rotation(full=False)
+        _.savefig('test_vel.png')
+
 
 
 
@@ -317,7 +354,7 @@ class disk:
     def velocity(self, r, z, **args):
 
         # Keplerian rotation (treating or not the vertical height)
-        vkep2 = self.G * self.mstar * self.r**2
+        vkep2 = self.G * self.mstar * r**2
         if args.pop("height", True):
             vkep2 /= np.hypot(r, z)**3
         else:
@@ -340,7 +377,7 @@ class disk:
         except KeyError:
             raise ValueError("Specify at least `xi`.")
         
-        return self.soundspeed() * xi
+        return self.soundspeed(T=self.Temp(r, z, **self.temp_args)) * xi
 
         
 
@@ -452,229 +489,28 @@ class disk:
         return fig
 
 
+    def plot_rotation(self, fig=None, contourf_kwargs=None, full=True):
+        fig, ax = self._grab_axes(fig)
+        R = self.rvals / self.AU
+        THETA = 0.5*np.pi - self.tvals[::-1]
+        VEL = self.vel[::-1]
+        toplot = np.vstack([VEL[::-1], VEL]) / 1e5
+        yaxis = np.concatenate([-THETA[::-1], THETA])
 
+        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
+        levels = np.linspace(0., 10., 50)
+        levels = contourf_kwargs.pop("levels", levels)
+        cmap = contourf_kwargs.pop("cmap", "RdBu_r")
+        im = ax.contourf(R, yaxis, toplot, levels=levels, cmap=cmap,
+                         **contourf_kwargs)
 
+        cax = make_axes_locatable(ax)
+        cax = cax.append_axes("right", size="4.5%" if full else "3%",
+                              pad="2.25%" if full else "1.5%")
+        cb = plt.colorbar(im, cax=cax)
+        cb.set_label(r"$v_{\phi} \,\, [{\rm km/s}]$", rotation=270,
+                     labelpad=15)
 
+        self._gentrify_structure_ax(ax, full=full)
+        return fig
 
-
-
-
-
-#    # dust surface density parameters
-#    self.Sig0_d = disk_params["Sig0_d"]
-#    self.R0_d = disk_params["R0_d"] * AU
-#    self.pd1 = disk_params["pd1"]
-#    self.pd2 = disk_params["pd2"]
-
-#        # gas surface density parameters
-#        self.Sig0_g = disk_params["Sig0_g"]
-#        self.R0_g = disk_params["R0_g"] * AU
-#        self.pg1 = disk_params["pg1"]
-#        self.pg2 = disk_params["pg2"]
-#        self.sigma_pdr = 10.**(disk_params["sig_pdr"])
-#        self.depl_pdr = disk_params["depl_pdr"]
-#        self.T_frz = disk_params["T_frz"]
-#        self.depl_frz = disk_params["depl_frz"]
-#        self.fmol = 10.**(disk_params["fmol"])
-
-#        # thermal structure parameters
-#        self.T0_mid = disk_params["T0_mid"]
-#        self.q_mid = disk_params["q_mid"]
-#        self.T0_atm = disk_params["T0_atm"]
-#        self.q_atm = disk_params["q_atm"]
-#        self.delta = disk_params["delta"]
-
-        # non-thermal broadening (as fraction of local sound speed)
-#        self.xi = disk_params["xi"]
-
-
-#    # DUST SURFACE DENSITY PROFILE
-#    def Sigma_d(self, r):
-#        sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
-#             np.exp(-(r / self.R0_d)**self.pd2)    
-#        return sd
-
-
-#    # GAS SURFACE DENSITY PROFILE
-#    def Sigma_g(self, r):
-#        sg = self.Sig0_g * (r / self.R0_g)**(-self.pg1) * \
-#             np.exp(-(r / self.R0_g)**self.pg2)
-#        return sg
-
-
-#    # MIDPLANE TEMPERATURE PROFILE
-#    def T_mid(self, r):
-#        return self.T0_mid * (r / (30.*AU))**(-self.q_mid)
-
-
-#    # ATMOSPHERE TEMPERATURE PROFILE (saturates at z_atm)
-#    def T_atm(self, r):
-#        return self.T0_atm * (r / (30.*AU))**(-self.q_atm)
-
-
-#    # PRESSURE SCALE HEIGHTS
-#    def Hp(self, r):
-#        Omega = np.sqrt(G * self.Mstar / r**3)
-#        c_s = np.sqrt(kB * self.T_mid(r) / (mu_gas * m_H))
-#        return c_s / Omega
-
-
-#    # 2-D TEMPERATURE STRUCTURE
-#    def Temp(self, r, z):
-#        self.z_atm = self.Hp(r) * 4	    # fix "atmosphere" to 4 * Hp
-#        Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
-#               np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
-#        if (z > self.z_atm): Trz = self.T_atm(r)
-#        return Trz
-
-
-#    # VERTICAL TEMPERATURE GRADIENT (dlnT / dz)
-#    def logTgrad(self, r, z):
-#        dT = -2 * self.delta * (self.T_mid(r) - self.T_atm(r)) * \
-#             (np.cos(PI * z / (2 * self.z_atm)))**(2*self.delta-1) * \
-#             np.sin(PI * z / (2 * self.z_atm)) * PI / (2 * self.z_atm) / \
-#             self.Temp(r,z)
-#        if (z > self.z_atm): dT = 0
-#        return dT
-
-
-#    # 2-D DUST DENSITY STRUCTURE
-#    def rho_d(self, r, z):
-#        z_dust = self.Hp(r) * 0.2	# fix dust scale height to lower
-#        dnorm = self.Sigma_d(r) / (np.sqrt(2 * PI) * z_dust)
-#        return dnorm * np.exp(-0.5 * (z / z_dust)**2)
-
-
-#    # 2-D GAS DENSITY STRUCTURE
-#    def rho_g(self, r, z):
-#    
-#        # set an upper atmosphere boundary
-#        z_max = 10 * self.z_atm
-#        PDR = False
-#
-#        # grid of z values for integration
-#        zvals = np.logspace(np.log10(0.1), np.log10(z_max+0.1), 1024) - 0.1
-#
-#        # load temperature gradient
-#        dlnTdz = self.logTgrad(r, z)
-# 
-#        # density gradient
-#        gz = G * self.Mstar * zvals / (r**2 + zvals**2)**1.5
-#        dlnpdz = -mu_gas * m_H * gz / (kB * self.Temp(r,z)) - dlnTdz
-#
-#        # numerical integration
-#        lnp = integrate.cumtrapz(dlnpdz, zvals, initial=0)
-#        dens0 = np.exp(lnp)
-#
-#        # normalized densities
-#        dens = 0.5 * self.Sigma_g(r) * dens0 / integrate.trapz(dens0, zvals)
-#        
-#        # interpolator for moving back onto the spatial grid
-#        f = interp1d(zvals, np.squeeze(dens), bounds_error=False, 
-#                     fill_value=(np.max(dens), 0))
-#
-#        # properly normalized gas densities
-#        rho_gas = np.float(f(z))
-#
-#        ## boolean indicator if this height is in the molecule's PDR
-#        # find index of nearest zvals cell
-#        index = np.argmin(np.abs(zvals-z))	
-#        # integrate the vertical density profile down to that height
-#        sig_index = integrate.trapz(dens[index:], zvals[index:])
-#        # criterion for photodissociation
-#        if (sig_index < (self.sigma_pdr * mu_gas * m_H * f_H)): 
-#            PDR = True
-
-#        return rho_gas, PDR
- 
-
-#    # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
-#    def nmol(self, r, z):
-    
-        # read in gas volume densities
-#        rho_gas, PDR = self.rho_g(r,z)
-
-        # abundance variations
-##        if (self.Temp(r,z) < self.T_frz): 
-##            Xmol = self.depl_frz * self.fmol
-##        elif PDR: 
-##            Xmol = self.depl_pdr * self.fmol
-##        else: 
-#        Xmol = self.fmol
-#
-#        return rho_gas * f_H2 * Xmol / (mu_gas * m_H)
-
-
-#    # GAS VELOCITY STRUCTURE
-#    def velocity(self, r):
-    
-#        vkep = np.sqrt(G * self.Mstar / r)
-
-#        return vkep
-
-
-#    # MICROTURBULENCE
-#    def vturb(self, r, z):
-#
-#        c_s = np.sqrt(kB * self.Temp(r, z) / (mu_gas * m_H))
-#        dv = self.xi * c_s   
-
-#        return dv
-
-
-    # WRITE OUT RADMC FILES
-#    def write_Model(self, Grid):
-        
-#        # file headers
-#        if (self.do_dust == 1):
-#            dustdens_inp = open(self.mdir+'dust_density.inp', 'w')
-#            dustdens_inp.write('1\n%d\n1\n' % Grid.ncells)
-
-#            dusttemp_inp = open(self.mdir+'dust_temperature.dat', 'w')
-#            dusttemp_inp.write('1\n%d\n1\n' % Grid.ncells)
-
-#        if (self.do_gas == 1):
-#            gasdens_inp = open(self.mdir+'gas_density.inp', 'w')
-#            gasdens_inp.write('1\n%d\n' % Grid.ncells)
-#
-#            gastemp_inp = open(self.mdir+'gas_temperature.inp', 'w')
-#            gastemp_inp.write('1\n%d\n' % Grid.ncells)
-#
-#            nmol_inp = open(self.mdir+'numberdens_'+self.molecule+'.inp', 'w')
-#            nmol_inp.write('1\n%d\n' % Grid.ncells)
-#
-#            vel_inp = open(self.mdir+'gas_velocity.inp', 'w')
-#            vel_inp.write('1\n%d\n' % Grid.ncells)
-#
-#            turb_inp = open(self.mdir+'microturbulence.inp', 'w')
-#            turb_inp.write('1\n%d\n' % Grid.ncells)
-#
-#        # populate files
-#        for phi in Grid.phi_centers:
-#            for theta in Grid.theta_centers:
-#                for r in Grid.r_centers:
-#                    r_cyl = r * np.sin(theta)
-#                    z = r * np.cos(theta)
-#
-#                    if (self.do_dust == 1):
-#                        dusttemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
-#                        dustdens_inp.write('%.6e\n' % self.rho_d(r_cyl, z))
-#
-#                    if (self.do_gas == 1):
-#                        gastemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
-#                        gasdens, dum = self.rho_g(r_cyl, z)
-#                        gasdens_inp.write('%.6e\n' % gasdens)
-#                        nmol_inp.write('%.6e\n' % self.nmol(r_cyl, z))
-#                        vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl))
-#                        turb_inp.write('%.6e\n' % self.vturb(r_cyl, z))
-#
-#        # close files
-#        if (self.do_dust == 1):
-#            dusttemp_inp.close()
-#            dustdens_inp.close()
-#        if (self.do_gas == 1):
-#            gastemp_inp.close()
-#            gasdens_inp.close()
-#            nmol_inp.close()
-#            vel_inp.close()
-#            turb_inp.close()
