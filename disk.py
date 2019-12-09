@@ -64,8 +64,14 @@ class disk:
 
         self.nmol = np.zeros_like(self.rcyl)
 
+        self.vel = np.zeros_like(self.rcyl)
+        self.vel_args = self.disk_params["rotation"]["arguments"]
 
-        # structure loop
+        self.turb = np.zeros_like(self.rcyl)
+        self.turb_args = self.disk_params["turbulence"]["arguments"]
+
+
+        # structure (and output) loop
         for j in range(len(self.tvals)):
             for i in range(len(self.rvals)):
 
@@ -80,6 +86,11 @@ class disk:
                 self.rhog[j,i], self.nmol[j,i] = self.Density_g(r, z, 
                                                      **self.dens_args)
 
+                # orbital motion
+                self.vel[j,i] = self.velocity(r, z, **self.vel_args)
+
+                # microturbulence
+                self.turb[j,i] = self.vturb(r, z, **self.turb_args)
 
 
 
@@ -291,14 +302,45 @@ class disk:
                 abund = xmol
             else: abund = xmol * args.pop("depletion", 1e-8)
 
+
         # molecular number density
         nmol = rhoz * abund / self.m_p / self.mu
 
-
         return rhoz, nmol
 
-            
 
+
+
+
+    # Dynamical functions.
+
+    def velocity(self, r, z, **args):
+
+        # Keplerian rotation (treating or not the vertical height)
+        vkep2 = self.G * self.mstar * self.r**2
+        if args.pop("height", True):
+            vkep2 /= np.hypot(r, z)**3
+        else:
+            vkep2 /= r**3
+
+        # radial pressure contribution
+        # TBD
+        vprs2 = 0.0
+
+        # self-gravity
+        # TBD
+        vgrv2 = 0.0
+
+        return np.sqrt(vkep2 + vprs2 + vgrv2)
+
+
+    def vturb(self, r, z, **args):
+        try:
+            xi = args["xi"]
+        except KeyError:
+            raise ValueError("Specify at least `xi`.")
+        
+        return self.soundspeed() * xi
 
         
 
