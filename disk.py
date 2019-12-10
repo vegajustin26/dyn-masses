@@ -23,7 +23,7 @@ class disk:
     G = sc.G * 1e3
 
     # fixed values
-    min_dens = 1e3  # minimum gas density in [H2/cm**3]
+    min_dens = 1e0  # minimum gas density in [H2/cm**3]
     max_dens = 1e20  # maximum gas density in [H2/cm**3]
     min_temp = 5e0  # minimum temperature in [K]
     max_temp = 5e2  # maximum temperature in [K]
@@ -86,6 +86,17 @@ class disk:
             turb_inp = open(modelname+'/microturbulence.inp', 'w')
             turb_inp.write('1\n%d\n' % (self.nr * self.nt))
 
+
+#        rr = 50. * self.AU
+#        tt = np.pi/2. - 1.45
+#        r = rr * np.sin(tt)
+#        z = rr * np.cos(tt)
+#        print(r / self.AU, z / self.AU)
+#        rhog, nmol = self.Density_g(r, z, **self.dens_args)
+#        print(np.log10(rhog / self.m_p / self.mu))
+
+
+
         # structure (and output) loop
         for j in range(len(self.tvals)):
             for i in range(len(self.rvals)):
@@ -128,20 +139,20 @@ class disk:
 
 
         # temporary plotter!
-        _ = self.plot_temp(full=False)
-        _.savefig('test_temp.png')
+        #_ = self.plot_temp(full=False)
+        #_.savefig('test_temp.png')
 
 
-        _ = self.plot_dens(full=False)
-        _.savefig('test_dens.png')
+        #_ = self.plot_dens(full=False)
+        #_.savefig('test_dens.png')
 
 
-        _ = self.plot_nmol(full=False)
-        _.savefig('test_nmol.png')
+        #_ = self.plot_nmol(full=False)
+        #_.savefig('test_nmol.png')
 
 
-        _ = self.plot_rotation(full=False)
-        _.savefig('test_vel.png')
+        #_ = self.plot_rotation(full=False)
+        #_.savefig('test_vel.png')
 
 
 
@@ -175,8 +186,12 @@ class disk:
                 (np.cos(np.pi * z / (2*zatm)))**(2*delta)
             if (z.size > 1):
                 T[z >= zatm] = Tatm
+                T[T > self.max_temp] = self.max_temp
+                T[T <= self.min_temp] = self.min_temp
             else:
                 if (z >= zatm): T = Tatm
+                if (T > self.max_temp): T = self.max_temp
+                if (T <= self.min_temp): T = self.min_temp
             return T
 
         # vertically isothermal
@@ -264,84 +279,98 @@ class disk:
         zmin, zmax, nz = 0.1, 5.*r, 1024
         zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz) - zmin
 
-        # vertical temperature profile
-        Tz = self.Temp(r, zg, **args)
+        # if z > zmax, return the minimum density
+        if (z >= zmax): 
+            rhoz = self.min_dens * self.m_p * self.mu
 
-        # vertical temperature gradient
-        dlnTdz = self.Tgrad_z(r, zg, **args)
+            try:
+                xmol = args["xmol"]
+            except KeyError:
+                print("Specify at least `xmol`.")
+            abund = xmol * args.pop("depletion", 1e-8)
+            nmol = abund * rhoz / self.m_p / self.mu
+
+        else:
+
+            # vertical temperature profile
+            Tz = self.Temp(r, zg, **args)
+
+            # vertical temperature gradient
+            dlnTdz = self.Tgrad_z(r, zg, **args)
                 
-        # vertical gravity
-        gz = self.G * self.mstar * zg / (self.soundspeed(T=Tz))**2
-        gz /= np.hypot(r, zg)**3
+            # vertical gravity
+            gz = self.G * self.mstar * zg / (self.soundspeed(T=Tz))**2
+            gz /= np.hypot(r, zg)**3
 
-        # vertical density gradient
-        dlnpdz = -dlnTdz - gz
+            # vertical density gradient
+            dlnpdz = -dlnTdz - gz
 
-        # numerical integration
-        lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
-        rho0 = np.exp(lnp)
+            # numerical integration
+            lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
+            rho0 = np.exp(lnp)
 
-        # normalize
-        rho = 0.5 * self.Sigma_g(r, **args) * \
-              rho0 / integrate.trapz(rho0, zg)
+            # normalize
+            rho = 0.5 * self.Sigma_g(r, **args) * \
+                  rho0 / integrate.trapz(rho0, zg)
 
-        # set up an interpolator for going back to the original gridpoint
-        f = interp1d(zg, rho, bounds_error=False, fill_value=(np.max(rho, 0)))
+            # set up an interpolator for going back to the original gridpoint
+            f = interp1d(zg, rho) #, bounds_error=False, fill_value=(np.max(rho, 0)))
 
-        # gas density at specified height
-        rhoz = f(z)
-
-
-        """ Molecular (number) densities """
-
-        try:
-            xmol = args["xmol"]
-        except KeyError:
-            print("Specify at least `xmol`.")
-
-        # 'chemical' setup, with constant abundance in a layer between the 
-        # freezeout temperature and photodissociation column
-        if self.disk_params["abundance"]["type"] == 'chemical':
-
-            # find the index of the nearest z cell
-            index = np.argmin(np.abs(zg-z))
-
-            # integrate the vertical density profile *down* to that height
-            sig_index = integrate.trapz(rho[index:], zg[index:])
-            NH2_index = sig_index / self.m_p / self.mu
-
-            # note the column density for photodissociation
-            Npd = 10.**(args.pop("logNpd", 21.11))
-
-            # note the freezeout temperature
-            Tfreeze = args.pop("tfreeze", 21.0)
-
-            # compute abundance
-            if ((NH2_index >= Npd) & 
-                (self.Temp(r, z, **self.temp_args) >= Tfreeze)):
-                abund = xmol
-            else: abund = xmol * args.pop("depletion", 1e-8)
-
-        # 'layer' setup, with constant abundance in a layer between specified
-        # radial and height (z / r) bounds
-        if self.disk_params["abundance"]["type"] == 'layer':
-
-            # identify the layer heights
-            zrmin = args.pop("zrmin", 0.0)
-            zrmax = args.pop("zrmax", 1.0)
-
-            # identify the layer radii
-            rmin = args.pop("rmin", self.rcyl.min()) * self.AU
-            rmax = args.pop("rmax", self.rcyl.max()) * self.AU
-
-            # compute abundance
-            if ((r > rmin) & (r <= rmax) & (z/r > zrmin) & (z/r <= zrmax)):
-                abund = xmol
-            else: abund = xmol * args.pop("depletion", 1e-8)
+            # gas density at specified height
+            rhoz = np.max([f(z), self.min_dens * self.m_p * self.mu])
 
 
-        # molecular number density
-        nmol = rhoz * abund / self.m_p / self.mu
+            """ Molecular (number) densities """
+
+            try:
+                xmol = args["xmol"]
+            except KeyError:
+                print("Specify at least `xmol`.")
+
+            # 'chemical' setup, with constant abundance in a layer between the 
+            # freezeout temperature and photodissociation column
+            if self.disk_params["abundance"]["type"] == 'chemical':
+
+                # find the index of the nearest z cell
+                index = np.argmin(np.abs(zg-z))
+
+                # integrate the vertical density profile *down* to that height
+                sig_index = integrate.trapz(rho[index:], zg[index:])
+                NH2_index = sig_index / self.m_p / self.mu
+
+                # note the column density for photodissociation
+                Npd = 10.**(args.pop("logNpd", 21.11))
+
+                # note the freezeout temperature
+                Tfreeze = args.pop("tfreeze", 21.0)
+
+                # compute abundance
+                if ((NH2_index >= Npd) & 
+                    (self.Temp(r, z, **self.temp_args) >= Tfreeze)):
+                    abund = xmol
+                else: abund = xmol * args.pop("depletion", 1e-8)
+
+            # 'layer' setup, with constant abundance in a layer between 
+            # specified radial and height (z / r) bounds
+            if self.disk_params["abundance"]["type"] == 'layer':
+
+                # identify the layer heights
+                zrmin = args.pop("zrmin", 0.0)
+                zrmax = args.pop("zrmax", 1.0)
+
+                # identify the layer radii
+                rmin = args.pop("rmin", self.rcyl.min()) * self.AU
+                rmax = args.pop("rmax", self.rcyl.max()) * self.AU
+
+                # compute abundance
+                if ((r > rmin) & (r <= rmax) & (z/r > zrmin) & (z/r <= zrmax)):
+                    abund = xmol
+                else: abund = xmol * args.pop("depletion", 1e-8)
+
+
+            # molecular number density
+            nmol = rhoz * abund / self.m_p / self.mu
+
 
         return rhoz, nmol
 
@@ -387,130 +416,3 @@ class disk:
     def powerlaw(x, y0, q, x0=1.0):
         """ Simple powerlaw function. """
         return y0 * (x / x0) ** q
-
-    @staticmethod
-    def _grab_axes(fig):
-        """ Split off the axis from the figure if provided. """
-        if fig is None:
-            fig, ax = plt.subplots()
-        else:
-            ax = fig.axes[0]
-        return fig, ax
-
-    @staticmethod
-    def _gentrify_structure_ax(ax, full=True):
-        """ Gentrify the plot. """
-        ax.set_xlim([2, 500])
-        ax.set_xscale('log')
-        ax.set_ylim([0.0, 0.6])
-        ax.set_xlabel("$R$ [au]")
-        ax.set_ylabel("$\pi$/2 - $\Theta$")
-        #    ax.set_aspect(1)
-        if not full:
-            ax.set_ylim(0.0, ax.get_ylim()[1])
-
-    def plot_temp(self, fig=None, contourf_kwargs=None, full=True):
-        fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
-        TEMP = self.temperature[::-1]
-        toplot = np.vstack([TEMP[::-1], TEMP])
-        yaxis = np.concatenate([-THETA[::-1], THETA])
-
-        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 300, 50)
-        levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "plasma")
-        im = ax.contourf(R, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
-
-        cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 300, 50))
-        cb.set_label(r"$T\,\,[{\rm K}]$", rotation=270, labelpad=15)
-
-        self._gentrify_structure_ax(ax, full=full)
-        return fig
-
-
-    def plot_dens(self, fig=None, contourf_kwargs=None, full=True):
-        fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
-        RHO = self.rhog[::-1]
-        toplot = np.vstack([RHO[::-1], RHO])
-        toplot = np.log10(toplot / (sc.m_p*1e3) / 2.37)
-        yaxis = np.concatenate([-THETA[::-1], THETA])
-
-        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 17, 50)
-        levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "bone_r")
-        im = ax.contourf(R, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
-
-        cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
-        cb.set_label(r"$\log_{10}(n_{\rm H_2}\,\,[{\rm cm^{-2}}])$",
-                     rotation=270, labelpad=15)
-        self._gentrify_structure_ax(ax, full=full)
-        return fig
-
-
-    def plot_nmol(self, fig=None, contourf_kwargs=None, full=True):
-        fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
-        NMOL = self.nmol[::-1]
-        toplot = np.vstack([NMOL[::-1], NMOL])
-        toplot = np.log10(toplot)
-        yaxis = np.concatenate([-THETA[::-1], THETA])
-
-        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(-12, 12, 50)
-        levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "afmhot_r")
-        im = ax.contourf(R, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
-
-        cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
-        cb.set_label(r"$\log_{10}(n_{\rm CO}\,\,[{\rm cm^{-2}}])$",
-                     rotation=270, labelpad=15)
-        self._gentrify_structure_ax(ax, full=full)
-        return fig
-
-
-    def plot_rotation(self, fig=None, contourf_kwargs=None, full=True):
-        fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
-        VEL = self.vel[::-1]
-        toplot = np.vstack([VEL[::-1], VEL]) / 1e5
-        yaxis = np.concatenate([-THETA[::-1], THETA])
-
-        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(0., 10., 50)
-        levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "RdBu_r")
-        im = ax.contourf(R, yaxis, toplot, levels=levels, cmap=cmap,
-                         **contourf_kwargs)
-
-        cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax)
-        cb.set_label(r"$v_{\phi} \,\, [{\rm km/s}]$", rotation=270,
-                     labelpad=15)
-
-        self._gentrify_structure_ax(ax, full=full)
-        return fig
-

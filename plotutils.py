@@ -25,6 +25,8 @@ class plotutils:
         config = yaml.load(conf, Loader=yaml.FullLoader)
         self.grids = config["grid"]["spatial"]
         self.setups = config["setup"]
+        self.rmin = self.grids["r_min"]
+        self.rmax = self.grids["r_max"]
         conf.close()
 
 
@@ -34,21 +36,36 @@ class plotutils:
                             skiprows=6, max_rows=nr+1)
         Twalls = np.loadtxt(modelname+'/amr_grid.inp', 
                             skiprows=nr+7, max_rows=nt+1)
-        Rgrid  = 0.5*(Rwalls[:-1] + Rwalls[1:])
-        Tgrid  = 0.5*(Twalls[:-1] + Twalls[1:])
+        self.Rgrid  = 0.5*(Rwalls[:-1] + Rwalls[1:])
+        self.Tgrid  = 0.5*(Twalls[:-1] + Twalls[1:])
 
         # recover density structure
         rho_in = np.loadtxt(modelname+'/gas_density.inp', skiprows=2)
-        rhog = np.reshape(rho_in, (nt, nr))
+        self.rhog = np.reshape(rho_in, (nt, nr))
 
         # recover abundance structure
         nmol_in = np.loadtxt(modelname+'/numberdens_' + 
                              self.setups["molecule"] + '.inp', skiprows=2)
-        nmol = np.reshape(nmol_in, (nt, nr))
+        self.nmol = np.reshape(nmol_in, (nt, nr))
 
         # recover temperature structure
         temp_in = np.loadtxt(modelname+'/gas_temperature.inp', skiprows=2)
-        temp = np.reshape(temp_in, (nt, nr))
+        self.temp = np.reshape(temp_in, (nt, nr))
+
+        # recover velocity structure
+        vel_in = np.loadtxt(modelname+'/gas_velocity.inp', skiprows=2)
+        self.vel = np.reshape(vel_in[:,2], (nt, nr))
+
+
+        # make plots
+        _ = self.plot_temp(full=False)
+        _.savefig(modelname+'/temp.png')
+        _ = self.plot_dens(full=False)
+        _.savefig(modelname+'/dens.png')
+        _ = self.plot_nmol(full=False)
+        _.savefig(modelname+'/nmol.png')
+        _ = self.plot_rotation(full=False)
+        _.savefig(modelname+'/vel.png')
 
 
 
@@ -65,9 +82,9 @@ class plotutils:
     @staticmethod
     def _gentrify_structure_ax(ax, full=True):
         """ Gentrify the plot. """
-        ax.set_xlim([2, 500])
+        ax.set_xlim([0.1, 500])
         ax.set_xscale('log')
-        ax.set_ylim([0.0, 0.6])
+        ax.set_ylim([0.0, np.pi/2.])
         ax.set_xlabel("$R$ [au]")
         ax.set_ylabel("$\pi$/2 - $\Theta$")
         #    ax.set_aspect(1)
@@ -76,9 +93,9 @@ class plotutils:
 
     def plot_temp(self, fig=None, contourf_kwargs=None, full=True):
         fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
-        TEMP = self.temperature[::-1]
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
+        TEMP = self.temp[::-1]
         toplot = np.vstack([TEMP[::-1], TEMP])
         yaxis = np.concatenate([-THETA[::-1], THETA])
 
@@ -102,8 +119,8 @@ class plotutils:
 
     def plot_dens(self, fig=None, contourf_kwargs=None, full=True):
         fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
         RHO = self.rhog[::-1]
         toplot = np.vstack([RHO[::-1], RHO])
         toplot = np.log10(toplot / (sc.m_p*1e3) / 2.37)
@@ -129,8 +146,8 @@ class plotutils:
 
     def plot_nmol(self, fig=None, contourf_kwargs=None, full=True):
         fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
         NMOL = self.nmol[::-1]
         toplot = np.vstack([NMOL[::-1], NMOL])
         toplot = np.log10(toplot)
@@ -156,8 +173,8 @@ class plotutils:
 
     def plot_rotation(self, fig=None, contourf_kwargs=None, full=True):
         fig, ax = self._grab_axes(fig)
-        R = self.rvals / self.AU
-        THETA = 0.5*np.pi - self.tvals[::-1]
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
         VEL = self.vel[::-1]
         toplot = np.vstack([VEL[::-1], VEL]) / 1e5
         yaxis = np.concatenate([-THETA[::-1], THETA])

@@ -1,0 +1,104 @@
+grid:
+    spatial:
+        nr: 256 
+        nt: 512 
+        np: 1 
+        r_min: 0.1
+        r_max: 500
+        
+    wavelength:
+        nw: 100
+        logw_min: -1.0
+        logw_max: 4.0
+
+setup:
+    incl_dust: 0
+    incl_lines: 1
+    incl_freefree: 0
+    scattering: 'Isotropic'
+    binary: False
+    camera_tracemode: 'image'
+    lines_mode: 'LTE'
+    molecule: 'co'
+    transition: 2
+
+host_params: 
+    T_eff: 4786 
+    R_star: 0.9 
+    M_star: 1.32 
+
+disk_params:
+
+    disk_grid:
+        nr: 2048
+        logr: 1
+        rmin: 0.0
+        rmax: 3.0
+        nz: 2048
+        logz: 1
+        zmin: -3.0
+        zmax: 3.5
+        
+    gas_surface_density:
+        type: 'self_similar'
+        arguments:
+            Rc: 150.
+            sig0: 30.
+            pg1: 0.75
+            pg2: 1.50
+
+    dust_surface_density:
+        type: 'powerlaw'
+        arguments:
+            redge: 50.
+            sig0: 0.3
+            pg1: 0.75
+
+    temperature:
+        type: 'dartois'
+        arguments:
+            rT0: 30.
+            T0mid: 30.
+            Tqmid: -0.5
+            T0atm: 60.
+            Tqatm: -0.5
+            delta: 1.0
+    density:
+        type: 'hydrostatic'
+        
+    abundance:
+        type: 'chemical'
+        arguments:
+            xmol: 0.0001
+            depletion: 0.00000001
+            logNpd: 20.699
+            tfreeze: 19.
+            zrmax: 0.45
+            zrmin: 0.005
+            rmin: 1.0
+            rmax: 300.0
+
+    rotation:
+        type: 'keplerian'
+        arguments:
+            height: 1
+            pressure: 0
+            selfgravity: 0
+
+    turbulence:
+        type: 'isotropic'
+        arguments:
+            xi: 0.01
+
+    dustspec: max1mm
+
+
+outputs:
+    PA: 327.3
+    incl: 52.7
+    dpc: 159
+    widthkms: 2.0
+    nchan: 15
+    npix: 750
+    RA: 165.5
+    DEC: -34.7
