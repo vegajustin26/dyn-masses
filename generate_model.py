@@ -18,10 +18,14 @@ sim_grid = grid(model_name)
 
 # generate a model structure on that grid
 print('making structure')
+t0 = time.time()
 sim_disk = disk(model_name, sim_grid)
+print(time.time()-t0)
 
 print('plotting structures')
 _ = plotutils(model_name)
+
+sys.exit()
 
 
 # raytracing

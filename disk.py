@@ -87,13 +87,12 @@ class disk:
             turb_inp.write('1\n%d\n' % (self.nr * self.nt))
 
 
-#        rr = 50. * self.AU
-#        tt = np.pi/2. - 1.45
+#        rr = 100. * self.AU
+#        tt = np.pi/2. - 0.05
 #        r = rr * np.sin(tt)
 #        z = rr * np.cos(tt)
-#        print(r / self.AU, z / self.AU)
-#        rhog, nmol = self.Density_g(r, z, **self.dens_args)
-#        print(np.log10(rhog / self.m_p / self.mu))
+#        vel = self.velocity(r, z, **self.vel_args)
+#        sys.exit()
 
 
 
@@ -314,7 +313,7 @@ class disk:
                   rho0 / integrate.trapz(rho0, zg)
 
             # set up an interpolator for going back to the original gridpoint
-            f = interp1d(zg, rho) #, bounds_error=False, fill_value=(np.max(rho, 0)))
+            f = interp1d(zg, rho) 
 
             # gas density at specified height
             rhoz = np.max([f(z), self.min_dens * self.m_p * self.mu])
@@ -389,9 +388,38 @@ class disk:
         else:
             vkep2 /= r**3
 
+
         # radial pressure contribution
-        # TBD
+        if args.pop("pressure", False):
+
+            # compute the gas pressure
+            rhogas0, nmol = self.Density_g(r, z, **self.dens_args)
+            Tgas0 = self.Temp(r, z, **self.temp_args)
+            Pgas0 = rhogas0 * self.kB * Tgas0 / self.m_p / self.mu
+
+            # define some neighboring radii
+            n_extra = 3
+            extra_range = 1.2
+            rext = np.logspace(np.log10(r / extra_range), 
+                               np.log10(r * extra_range), 2*n_extra + 1)
+ 
+            # compute radial pressure gradient
+            Pgas = np.zeros_like(rext)
+            rhog = np.zeros_like(rext)
+            for ir in range(len(rext)):
+                rhog[ir], nmol = self.Density_g(rext[ir], z, **self.dens_args)
+                Tgas = self.Temp(rext[ir], z, **self.temp_args)
+                Pgas[ir] = rhog[ir] * self.kB * Tgas / self.m_p / self.mu
+            gradP = np.gradient(Pgas, rext)
+            dPdr = gradP[n_extra]
+
+            # calculate pressure perturbation to velocity field
+            if (rhog[n_extra] > 0.):
+                vprs2 = r * dPdr / rhog[n_extra]
+            else: vprs2 = 0.0
+
         vprs2 = 0.0
+
 
         # self-gravity
         # TBD
