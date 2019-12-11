@@ -97,8 +97,8 @@ outputs:
     PA: 327.3
     incl: 52.7
     dpc: 159
-    widthkms: 2.0
-    nchan: 15
+    widthkms: 10.0
+    nchan: 40
     npix: 750
     RA: 165.5
     DEC: -34.7

@@ -137,31 +137,6 @@ class disk:
 
 
 
-        # temporary plotter!
-        #_ = self.plot_temp(full=False)
-        #_.savefig('test_temp.png')
-
-
-        #_ = self.plot_dens(full=False)
-        #_.savefig('test_dens.png')
-
-
-        #_ = self.plot_nmol(full=False)
-        #_.savefig('test_nmol.png')
-
-
-        #_ = self.plot_rotation(full=False)
-        #_.savefig('test_vel.png')
-
-
-
-
-
-
-
-
-
-
 
     # Temperature functions.
 
