@@ -12,7 +12,7 @@ grid:
         logw_max: 4.0
 
 setup:
-    incl_dust: 0
+    incl_dust: 1
     incl_lines: 1
     incl_freefree: 0
     scattering: 'Isotropic'
@@ -50,9 +50,10 @@ disk_params:
     dust_surface_density:
         type: 'powerlaw'
         arguments:
-            redge: 50.
-            sig0: 0.3
-            pg1: 0.75
+            rdedge: 50.
+            sigd0: 0.3
+            pd1: 0.75
+            hdust: 0.5
 
     temperature:
         type: 'dartois'
@@ -63,8 +64,6 @@ disk_params:
             T0atm: 60.
             Tqatm: -0.5
             delta: 1.0
-    density:
-        type: 'hydrostatic'
         
     abundance:
         type: 'chemical'

@@ -26,6 +26,9 @@ print('plotting structures')
 _ = plotutils(model_name)
 
 
+sys.exit()
+
+
 
 # raytracing
 print('raytracing')

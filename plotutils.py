@@ -39,34 +39,38 @@ class plotutils:
         self.Rgrid  = 0.5*(Rwalls[:-1] + Rwalls[1:])
         self.Tgrid  = 0.5*(Twalls[:-1] + Twalls[1:])
 
-        # recover density structure
-        rho_in = np.loadtxt(modelname+'/gas_density.inp', skiprows=2)
-        self.rhog = np.reshape(rho_in, (nt, nr))
-
-        # recover abundance structure
-        nmol_in = np.loadtxt(modelname+'/numberdens_' + 
-                             self.setups["molecule"] + '.inp', skiprows=2)
-        self.nmol = np.reshape(nmol_in, (nt, nr))
-
         # recover temperature structure
         temp_in = np.loadtxt(modelname+'/gas_temperature.inp', skiprows=2)
         self.temp = np.reshape(temp_in, (nt, nr))
-
-        # recover velocity structure
-        vel_in = np.loadtxt(modelname+'/gas_velocity.inp', skiprows=2)
-        self.vel = np.reshape(vel_in[:,2], (nt, nr))
-
-
-        # make plots
         _ = self.plot_temp(full=False)
         _.savefig(modelname+'/temp.png')
-        _ = self.plot_dens(full=False)
-        _.savefig(modelname+'/dens.png')
-        _ = self.plot_nmol(full=False)
-        _.savefig(modelname+'/nmol.png')
-        _ = self.plot_rotation(full=False)
-        _.savefig(modelname+'/vel.png')
 
+        if self.setups["incl_lines"]:
+            # recover gas density structure
+            rho_in = np.loadtxt(modelname+'/gas_density.inp', skiprows=2)
+            self.rhog = np.reshape(rho_in, (nt, nr))
+            _ = self.plot_dens(full=False)
+            _.savefig(modelname+'/dens.png')
+
+            # recover abundance structure
+            nmol_in = np.loadtxt(modelname+'/numberdens_' + 
+                                 self.setups["molecule"] + '.inp', skiprows=2)
+            self.nmol = np.reshape(nmol_in, (nt, nr))
+            _ = self.plot_nmol(full=False)
+            _.savefig(modelname+'/nmol.png')
+
+            # recover velocity structure
+            vel_in = np.loadtxt(modelname+'/gas_velocity.inp', skiprows=2)
+            self.vel = np.reshape(vel_in[:,2], (nt, nr))
+            _ = self.plot_rotation(full=False)
+            _.savefig(modelname+'/vel.png')
+
+        if self.setups["incl_dust"]:
+            # recover dust density structure
+            rhod_in = np.loadtxt(modelname+'/dust_density.inp', skiprows=3)
+            self.rhod = np.reshape(rhod_in, (nt, nr))
+            _ = self.plot_dustdens(full=False)
+            _.savefig(modelname+'/dustdens.png')
 
 
 
@@ -138,7 +142,34 @@ class plotutils:
         cax = cax.append_axes("right", size="4.5%" if full else "3%",
                               pad="2.25%" if full else "1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
-        cb.set_label(r"$\log_{10}(n_{\rm H_2}\,\,[{\rm cm^{-2}}])$",
+        cb.set_label(r"$\log_{10}(n_{\rm H_2}\,\,[{\rm cm^{-3}}])$",
+                     rotation=270, labelpad=15)
+        self._gentrify_structure_ax(ax, full=full)
+        return fig
+
+
+    def plot_dustdens(self, fig=None, contourf_kwargs=None, full=True):
+        fig, ax = self._grab_axes(fig)
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
+        RHO = self.rhod[::-1]
+        toplot = np.vstack([RHO[::-1], RHO])
+        toplot = np.log10(toplot)
+        yaxis = np.concatenate([-THETA[::-1], THETA])
+
+        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
+        levels = np.linspace(toplot.min(), toplot.max(), 50)
+        levels = np.linspace(-20, -7, 50)
+        levels = contourf_kwargs.pop("levels", levels)
+        cmap = contourf_kwargs.pop("cmap", "bone_r")
+        im = ax.contourf(R, yaxis, toplot, levels=levels,
+                         cmap=cmap, **contourf_kwargs)
+
+        cax = make_axes_locatable(ax)
+        cax = cax.append_axes("right", size="4.5%" if full else "3%",
+                              pad="2.25%" if full else "1.5%")
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-50, -5, 2))
+        cb.set_label(r"$\log_{10}(\rho_{\rm dust}\,\,[{\rm g cm^{-3}}])$",
                      rotation=270, labelpad=15)
         self._gentrify_structure_ax(ax, full=full)
         return fig
