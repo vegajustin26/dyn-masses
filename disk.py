@@ -91,7 +91,7 @@ class disk:
             if writestruct:
                 rhod_inp = open(modelname+'/dust_density.inp', 'w')
                 rhod_inp.write('1\n%d\n1\n' % (self.nr * self.nt))
-                tdust_inp = open(modelname+'/dust_temperature.inp', 'w')
+                tdust_inp = open(modelname+'/dust_temperature.dat', 'w')
                 tdust_inp.write('1\n%d\n1\n' % (self.nr * self.nt))
 
 

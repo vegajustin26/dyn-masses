@@ -136,6 +136,21 @@ class grid:
             f.write('lines_mode = 1\n')
         f.close()
 
+        ### DUST CONFIG FILE
+        if (conf_params["incl_dust"] == 1):
+            f = open(self.modeldir + 'dustopac.inp', 'w')
+            f.write('2\n1\n')
+            f.write('============================================================================\n')
+            f.write('1\n0\n')
+            f.write('%s\n' % conf_params["dustspec"])
+            f.write('----------------------------------------------------------------------------')
+            f.close()
+
+            # copy appropriate opacity file
+            os.system('cp opacs/dustkappa_'+conf_params["dustspec"]+'.inp ' + \
+                      self.modeldir)
+
+
         ### LINE DATA CONFIG FILE
         if (conf_params["incl_lines"] == 1):
             f = open(self.modeldir + 'lines.inp', 'w')
@@ -147,3 +162,7 @@ class grid:
             os.system('cp moldata/'+conf_params["molecule"]+'.dat ' + \
                       self.modeldir + \
                       'molecule_'+conf_params["molecule"]+'.inp')
+
+
+
+
