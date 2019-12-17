@@ -11,8 +11,9 @@ grid:
         logw_min: -1.0
         logw_max: 4.0
 
+
 setup:
-    incl_dust: 1
+    incl_dust: 0
     incl_lines: 1
     incl_freefree: 0
     scattering: 'Isotropic'
@@ -23,13 +24,14 @@ setup:
     transition: 2
     dustspec: 'DIANAstandard'
 
+
 host_params: 
     T_eff: 4786 
     R_star: 0.9 
     M_star: 1.32 
 
-disk_params:
 
+disk_params:
     disk_grid:
         nr: 2048
         logr: 1
@@ -92,11 +94,17 @@ disk_params:
 
 
 outputs:
-    PA: 327.3
-    incl: 52.7
-    dpc: 159
-    widthkms: 2.0
-    nchan: 4 
-    npix: 750
-    RA: 165.5
-    DEC: -34.7
+    geometry:
+        dpc: 159                # distance in pc
+        PA: 90.0                # PA: of blueshifted major axis (!)
+        incl: 120.              # incl: along major axis, "top" is near side if
+                                # incl < 90, "bottom" if incl > 90 
+
+    spatial:
+        ires: 0.01
+        RA: 165.5
+        DEC: -34.7
+
+    velocity:
+        widthkms: 5.0
+        dfreq: 244              # final frequency resolution, in kHz
