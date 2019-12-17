@@ -1,7 +1,7 @@
 grid:
     spatial:
-        nr: 128 
-        nt: 128 
+        nr: 128
+        nt: 128
         np: 1 
         r_min: 0.1
         r_max: 500
@@ -101,10 +101,11 @@ outputs:
                                 # incl < 90, "bottom" if incl > 90 
 
     spatial:
-        ires: 0.01
+        ires: 0.010
         RA: 165.5
         DEC: -34.7
 
     velocity:
-        widthkms: 5.0
-        dfreq: 244              # final frequency resolution, in kHz
+        widthkms: 3.0
+        dfreq: 122              # final frequency resolution, in kHz
+        oversample: 1

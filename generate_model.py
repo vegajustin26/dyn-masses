@@ -14,17 +14,17 @@ model_name = 'demo'
 
 
 # generate the spatial grid
-#sim_grid = grid(model_name)
+sim_grid = grid(model_name)
 
 
 # generate a model structure on that grid
-#print('making structure')
-#t0 = time.time()
-#sim_disk = disk(model_name, sim_grid)
-#print(time.time()-t0)
+print('making structure')
+t0 = time.time()
+sim_disk = disk(model_name, sim_grid)
+print(time.time()-t0)
 
-#print('plotting structures')
-#_ = plotutils(model_name)
+print('plotting structures')
+_ = plotutils(model_name)
 
 
 # raytrace out a set of channel maps

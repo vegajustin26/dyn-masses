@@ -32,8 +32,11 @@ class raytrace_maps:
 
         DV0 = 2 * 1e5 * outpars["velocity"]["widthkms"]
         dnu = 1e3 * outpars["velocity"]["dfreq"]	
-        nchan = np.int(np.ceil(DV0 * nu0 / cc / dnu))
-        widthkms = (nchan - 1) * cc * dnu / nu0 / 1e5 / 2
+        nchan = outpars["velocity"]["oversample"] * \
+                np.int(np.ceil(DV0 * nu0 / cc / dnu))
+        widthkms = (nchan - 1) * cc * dnu / nu0 / 1e5 / 2 / \
+                   outpars["velocity"]["oversample"]
+
 
         # run raytracer
         os.chdir(modelname)
@@ -54,4 +57,5 @@ class raytrace_maps:
             os.system('rm ' + outfile)
             convert_to_fits('image.out', outfile, outpars["geometry"]["dpc"], 
                             RA=outpars["spatial"]["RA"], 
-                            DEC=outpars["spatial"]["DEC"])
+                            DEC=outpars["spatial"]["DEC"], 
+                            downsample=outpars["velocity"]["oversample"])
