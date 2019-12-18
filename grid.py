@@ -14,11 +14,19 @@ class grid:
 
         # load grid parameters 
         conf = open(modelname+'.yaml')
-        self.grid_params = yaml.load(conf, Loader=yaml.FullLoader)["grid"]
+        config = yaml.load(conf, Loader=yaml.FullLoader)
+        self.grid_params = config["grid"]
+        self.disk_pars = config["disk_params"]
+        self.setup = config["setup"]
         conf.close()
 
         # populate the grids
-        self._read_spatial_grid(self.grid_params["spatial"]) 
+        if self.setup["substruct"]:
+            args = {**self.grid_params["spatial"], 
+                    **self.disk_pars["substructure"]["arguments"]}
+            self._read_spatial_grid(args, refine=True)
+        else:
+            self._read_spatial_grid(self.grid_params["spatial"]) 
         self.grid_params["wavelength"] = self.grid_params.pop("wavelength", {})
         self._read_wavelength_grid(self.grid_params["wavelength"])
         print('Grids successfully populated.')
@@ -33,13 +41,12 @@ class grid:
 
 
 
-    def _read_spatial_grid(self, params):
+    def _read_spatial_grid(self, params, refine=False):
         """ Populate the spatial grid in spherical polar coordinates """
         # number of cells
         self.nr = params["nr"]
         self.nt = params["nt"]
         self.np = params["np"]
-        self.ncells = self.nr * self.nt * self.np
 
         # radial grid in [cm]
         self.r_in = params["r_min"] * sc.au * 1e2
@@ -48,7 +55,31 @@ class grid:
                                    self.nr+1)
         self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
                                     axis=0)
+
+        if refine:
+            rgaps, wgaps = params["rgaps"], params["wgaps"]
+            ngaps = len(rgaps)
+            dr = 2.0	# sigma
+
+            for ig in range(ngaps):
+                rg = rgaps[ig] * sc.au * 1e2
+                wg = wgaps[ig] * sc.au * 1e2
+                reg = ((self.r_walls > (rg - dr * wg)) & 
+                       (self.r_walls < (rg + dr * wg)))
+                if (len(self.r_walls[reg]) < 30):
+                    r_exc = self.r_walls[~reg]
+                    r_add = rg + np.linspace(-dr*wg, dr*wg, 30)
+                    self.r_walls = np.sort(np.concatenate((r_exc, r_add)))
+
+            self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
+                                        axis=0)
+            self.nr = len(self.r_centers)
+
         assert self.r_centers.size == self.nr
+
+
+        # number of cells
+        self.ncells = self.nr * self.nt * self.np
 
         # theta (altitude angle from pole toward equator) grid in [rad]
         self.t_offset = params.get("t_offset", 0.1)

@@ -31,7 +31,9 @@ class plotutils:
 
 
         # recover the spatial grid
-        nr, nt = self.grids["nr"], self.grids["nt"]
+        #nr, nt = self.grids["nr"], self.grids["nt"]
+        _ = np.loadtxt(modelname+'/amr_grid.inp', skiprows=5, max_rows=1)
+        nr, nt = np.int(_[0]), np.int(_[1])
         Rwalls = np.loadtxt(modelname+'/amr_grid.inp', 
                             skiprows=6, max_rows=nr+1)
         Twalls = np.loadtxt(modelname+'/amr_grid.inp', 

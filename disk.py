@@ -287,7 +287,7 @@ class disk:
                 # impose substructures
                 rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"] 
                 depl = 0.0
-                for ig in range(len(rgaps)):
+                for ig in range(len(rss)):
                     rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
                     depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
                 sigg *= (1. + depl)
