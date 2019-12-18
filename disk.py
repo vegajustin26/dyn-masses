@@ -62,7 +62,9 @@ class disk:
             self.rhog = np.zeros_like(self.rcyl)
             rho_args = self.disk_params["gas_surface_density"]["arguments"]
             nmol_args = self.disk_params["abundance"]["arguments"]
-            self.dens_args = {**rho_args, **self.temp_args, **nmol_args}
+            sub_args = self.disk_params["substructure"]["arguments"]
+            self.dens_args = {**rho_args, **self.temp_args, **nmol_args, 
+                              **sub_args}
             self.nmol = np.zeros_like(self.rcyl)
             self.vel = np.zeros_like(self.rcyl)
             self.vel_args = self.disk_params["rotation"]["arguments"]
@@ -258,6 +260,15 @@ class disk:
             if (r > rdedge): 
                 return 0
             else:
+                if self.setups["substruct"]:
+                    # impose substructures
+                    rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"]
+                    depl = 0.0
+                    for ig in range(len(rgaps)):
+                        rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                        depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
+                    sigd *= (1. + depl)
+
                 return sigd
 
 
@@ -270,7 +281,18 @@ class disk:
                 pg2 = args.pop("pg2", 2.0 - pg1)
             except KeyError:
                 raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
-            return self.powerlaw(r, sig0, -pg1, Rc) * np.exp(-(r / Rc)**pg2)
+            sigg = self.powerlaw(r, sig0, -pg1, Rc) * np.exp(-(r / Rc)**pg2)
+
+            if self.setups["substruct"]:
+                # impose substructures
+                rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"] 
+                depl = 0.0
+                for ig in range(len(rgaps)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
+                sigg *= (1. + depl)
+
+            return sigg
 
         # power-law
         if self.disk_params["gas_surface_density"]["type"] == 'powerlaw':
@@ -283,6 +305,15 @@ class disk:
             if (r > redge):
                 return 0
             else:
+                if self.setups["substruct"]:
+                    # impose substructures
+                    rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"]
+                    depl = 0.0
+                    for ig in range(len(rgaps)):
+                        rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                        depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
+                    sigg *= (1. + depl)
+
                 return sigg
 
 
