@@ -266,8 +266,8 @@ class disk:
                     depl = 0.0
                     for ig in range(len(rgaps)):
                         rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                        depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
-                    sigd *= (1. + depl)
+                        depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                    sigd /= (1. + depl)
 
                 return sigd
 
@@ -289,8 +289,8 @@ class disk:
                 depl = 0.0
                 for ig in range(len(rss)):
                     rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                    depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
-                sigg *= (1. + depl)
+                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                sigg /= (1. + depl)
 
             return sigg
 
@@ -311,8 +311,8 @@ class disk:
                     depl = 0.0
                     for ig in range(len(rgaps)):
                         rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                        depl -= (1. - dss[ig]) * np.exp(-0.5*((r - rg) / wg)**2)
-                    sigg *= (1. + depl)
+                        depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                    sigg /= (1. + depl)
 
                 return sigg
 

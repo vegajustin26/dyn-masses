@@ -88,9 +88,11 @@ class plotutils:
     @staticmethod
     def _gentrify_structure_ax(ax, full=True):
         """ Gentrify the plot. """
-        ax.set_xlim([0.1, 500])
-        ax.set_xscale('log')
-        ax.set_ylim([0.0, np.pi/2.])
+        ax.set_xlim([40, 160])
+        #ax.set_xlim([0.1, 500])
+        #ax.set_xscale('log')
+        #ax.set_ylim([0.0, np.pi/2.])
+        ax.set_ylim([0.0, 0.7])
         ax.set_xlabel("$R$ [au]")
         ax.set_ylabel("$\pi$/2 - $\Theta$")
         #    ax.set_aspect(1)

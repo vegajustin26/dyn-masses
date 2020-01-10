@@ -59,16 +59,16 @@ class grid:
         if refine:
             rgaps, wgaps = params["rgaps"], params["wgaps"]
             ngaps = len(rgaps)
-            dr = 2.0	# sigma
+            dr = 3.0	# sigma
 
             for ig in range(ngaps):
                 rg = rgaps[ig] * sc.au * 1e2
                 wg = wgaps[ig] * sc.au * 1e2
                 reg = ((self.r_walls > (rg - dr * wg)) & 
                        (self.r_walls < (rg + dr * wg)))
-                if (len(self.r_walls[reg]) < 30):
+                if (len(self.r_walls[reg]) < 60):
                     r_exc = self.r_walls[~reg]
-                    r_add = rg + np.linspace(-dr*wg, dr*wg, 30)
+                    r_add = rg + np.linspace(-dr*wg, dr*wg, 61)
                     self.r_walls = np.sort(np.concatenate((r_exc, r_add)))
 
             self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],

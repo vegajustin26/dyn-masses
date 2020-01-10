@@ -1,7 +1,7 @@
 grid:
     spatial:
-        nr: 128
-        nt: 128
+        nr: 256
+        nt: 256
         np: 1 
         r_min: 0.1
         r_max: 500
@@ -47,8 +47,8 @@ disk_params:
         type: 'gaps'
         arguments:
             rgaps: [10., 100., 200.]
-            wgaps: [1.,  20.,  20.]
-            dgaps: [0.0001, 0.0001, 0.0001]
+            wgaps: [1.,  3.,  10.]
+            dgaps: [100, 1000000000., 100]
         
     gas_surface_density:
         type: 'self_similar'
