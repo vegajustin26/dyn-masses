@@ -56,6 +56,7 @@ class disk:
 
         # structure setups
         self.temperature = np.zeros_like(self.rcyl)
+        self.gradT = np.zeros_like(self.rcyl)
         self.temp_args = self.disk_params["temperature"]["arguments"]
 
         if self.setups["incl_lines"]:
@@ -77,6 +78,8 @@ class disk:
                 rhog_inp.write('1\n%d\n' % (self.nr * self.nt))
                 temp_inp = open(modelname+'/gas_temperature.inp', 'w')
                 temp_inp.write('1\n%d\n' % (self.nr * self.nt))
+                tgrad_inp = open(modelname+'/gas_tempgradient.inp', 'w')
+                tgrad_inp.write('1\n%d\n' % (self.nr * self.nt))
                 mname = self.setups["molecule"]
                 nmol_inp = open(modelname+'/numberdens_'+mname+'.inp', 'w')
                 nmol_inp.write('1\n%d\n' % (self.nr * self.nt))
@@ -97,7 +100,7 @@ class disk:
                 tdust_inp.write('1\n%d\n1\n' % (self.nr * self.nt))
 
 
-#        rr = 100. * self.AU
+#        rr = 97. * self.AU
 #        tt = np.pi/2. - 0.05
 #        r = rr * np.sin(tt)
 #        z = rr * np.cos(tt)
@@ -116,6 +119,7 @@ class disk:
 
                 # temperature
                 self.temperature[j,i] = self.Temp(r, z, **self.temp_args)
+                self.gradT[j,i] = self.Tgrad_z(r, z, **self.temp_args)
 
                 if self.setups["incl_lines"]:
                     # gas density and number density (of given molecule)
@@ -131,6 +135,7 @@ class disk:
                     # write into structure files
                     if writestruct:
                         temp_inp.write('%.6e\n' % self.temperature[j,i])
+                        tgrad_inp.write('%.6e\n' % self.gradT[j,i])
                         rhog_inp.write('%.6e\n' % self.rhog[j,i])
                         nmol_inp.write('%.6e\n' % self.nmol[j,i])
                         vel_inp.write('0 0 %.6e\n' % self.vel[j,i])
@@ -151,6 +156,7 @@ class disk:
         if writestruct:
             if self.setups["incl_lines"]:
                 temp_inp.close()
+                tgrad_inp.close()
                 rhog_inp.close()
                 nmol_inp.close()
                 vel_inp.close()
@@ -235,7 +241,10 @@ class disk:
             dT = -2 * delta * (Tmid - Tatm) * \
                  (np.cos(np.pi * z / (2*zatm)))**(2*delta-1) * \
                  np.sin(np.pi * z / (2*zatm)) * np.pi / (2 * zatm) / T
-            dT[z >= zatm] = 0
+            if (z.size > 1):
+                dT[z >= zatm] = 0
+            else:
+                if (z >= zatm): dT = 0
             return dT
 
         # vertically isothermal
@@ -456,7 +465,7 @@ class disk:
             Pgas0 = rhogas0 * self.kB * Tgas0 / self.m_p / self.mu
 
             # define some neighboring radii
-            n_extra = 3
+            n_extra = 6
             extra_range = 1.2
             rext = np.logspace(np.log10(r / extra_range), 
                                np.log10(r * extra_range), 2*n_extra + 1)
@@ -470,13 +479,17 @@ class disk:
                 Pgas[ir] = rhog[ir] * self.kB * Tgas / self.m_p / self.mu
             gradP = np.gradient(Pgas, rext)
             dPdr = gradP[n_extra]
+        #    print(dPdr)
 
             # calculate pressure perturbation to velocity field
             if (rhog[n_extra] > 0.):
                 vprs2 = r * dPdr / rhog[n_extra]
             else: vprs2 = 0.0
+        else:
+            vprs2 = 0.0
 
-        vprs2 = 0.0
+        #print(vkep2, vprs2, vkep2 + vprs2)
+
 
 
         # self-gravity

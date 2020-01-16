@@ -1,6 +1,6 @@
 grid:
     spatial:
-        nr: 256
+        nr: 512
         nt: 256
         np: 1 
         r_min: 0.1
@@ -46,9 +46,9 @@ disk_params:
     substructure:
         type: 'gaps'
         arguments:
-            rgaps: [10., 100., 200.]
-            wgaps: [1.,  3.,  10.]
-            dgaps: [100, 1000000000., 100]
+            rgaps: []
+            wgaps: []
+            dgaps: []
         
     gas_surface_density:
         type: 'self_similar'
@@ -75,6 +75,7 @@ disk_params:
             T0atm: 60.
             Tqatm: -0.5
             delta: 1.0
+            ZqHp: 4.0
         
     abundance:
         type: 'chemical'

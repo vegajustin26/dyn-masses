@@ -47,6 +47,12 @@ class plotutils:
         _ = self.plot_temp(full=False)
         _.savefig(modelname+'/temp.png')
 
+        # recover temperature gradient structure
+        tgrad_in = np.loadtxt(modelname+'/gas_tempgradient.inp', skiprows=2)
+        self.tgrad = np.reshape(tgrad_in, (nt, nr))
+        _ = self.plot_tgrad(full=False)
+        _.savefig(modelname+'/tgrad.png')
+
         if self.setups["incl_lines"]:
             # recover gas density structure
             rho_in = np.loadtxt(modelname+'/gas_density.inp', skiprows=2)
@@ -88,11 +94,11 @@ class plotutils:
     @staticmethod
     def _gentrify_structure_ax(ax, full=True):
         """ Gentrify the plot. """
-        ax.set_xlim([40, 160])
-        #ax.set_xlim([0.1, 500])
-        #ax.set_xscale('log')
-        #ax.set_ylim([0.0, np.pi/2.])
-        ax.set_ylim([0.0, 0.7])
+        #ax.set_xlim([40, 160])
+        ax.set_xlim([2., 500])
+        ax.set_xscale('log')
+        ax.set_ylim([0.0, np.pi/2.])
+        ax.set_ylim([0.0, 0.5])
         ax.set_xlabel("$R$ [au]")
         ax.set_ylabel("$\pi$/2 - $\Theta$")
         #    ax.set_aspect(1)
@@ -125,6 +131,32 @@ class plotutils:
         return fig
 
 
+    def plot_tgrad(self, fig=None, contourf_kwargs=None, full=True):
+        fig, ax = self._grab_axes(fig)
+        R = self.Rgrid / self.AU
+        THETA = 0.5*np.pi - self.Tgrid[::-1]
+        TGRAD = np.log10(self.tgrad[::-1])
+        toplot = np.vstack([TGRAD[::-1], TGRAD])
+        yaxis = np.concatenate([-THETA[::-1], THETA])
+
+        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
+        levels = np.linspace(toplot.min(), toplot.max(), 50)
+        levels = np.linspace(-16, -12, 50)
+        levels = contourf_kwargs.pop("levels", levels)
+        cmap = contourf_kwargs.pop("cmap", "plasma")
+        im = ax.contourf(R, yaxis, toplot, levels=levels,
+                         cmap=cmap, **contourf_kwargs)
+
+        cax = make_axes_locatable(ax)
+        cax = cax.append_axes("right", size="4.5%" if full else "3%",
+                              pad="2.25%" if full else "1.5%")
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-16, -12, 50))
+        cb.set_label(r"$T\,\,[{\rm K}]$", rotation=270, labelpad=15)
+
+        self._gentrify_structure_ax(ax, full=full)
+        return fig
+
+
     def plot_dens(self, fig=None, contourf_kwargs=None, full=True):
         fig, ax = self._grab_axes(fig)
         R = self.Rgrid / self.AU
@@ -136,7 +168,7 @@ class plotutils:
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
         levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 17, 50)
+        levels = np.linspace(3, 12, 50)
         levels = contourf_kwargs.pop("levels", levels)
         cmap = contourf_kwargs.pop("cmap", "bone_r")
         im = ax.contourf(R, yaxis, toplot, levels=levels,
@@ -215,9 +247,9 @@ class plotutils:
         yaxis = np.concatenate([-THETA[::-1], THETA])
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(0., 10., 50)
+        levels = np.linspace(0., 6.5, 50)
         levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "RdBu_r")
+        cmap = contourf_kwargs.pop("cmap", "viridis")
         im = ax.contourf(R, yaxis, toplot, levels=levels, cmap=cmap,
                          **contourf_kwargs)
 
