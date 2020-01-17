@@ -98,7 +98,7 @@ class plotutils:
         ax.set_xlim([2., 500])
         ax.set_xscale('log')
         ax.set_ylim([0.0, np.pi/2.])
-        ax.set_ylim([0.0, 0.5])
+        ax.set_ylim([0.0, 0.7])
         ax.set_xlabel("$R$ [au]")
         ax.set_ylabel("$\pi$/2 - $\Theta$")
         #    ax.set_aspect(1)
@@ -168,9 +168,9 @@ class plotutils:
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
         levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 12, 50)
+        levels = np.linspace(0, 14, 50)
         levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "bone_r")
+        cmap = contourf_kwargs.pop("cmap", "plasma")
         im = ax.contourf(R, yaxis, toplot, levels=levels,
                          cmap=cmap, **contourf_kwargs)
 

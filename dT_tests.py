@@ -89,8 +89,9 @@ def Tgrad(R, THETA, **args):
     dTana[abs(zcyl) > zatm] = 0
 
     # numerical gradient (in spherical coordinates)
-    dT = -np.gradient(np.log(T), THETA[:,0], axis=0) / rcyl
-    dT[abs(zcyl) > zatm] = 0
+    dT = np.gradient(np.log(T), R[0,:], axis=1) * np.cos(THETA) - \
+         np.gradient(np.log(T), THETA[:,0], axis=0) * np.sin(THETA) / R
+   
 
     # fractional difference from analytic
     diff_dT = (dT - dTana) / dTana
