@@ -163,44 +163,12 @@ gz = G * Mstar * msun * zcyl / RR**3 / cs2
 dlnpdz = -dTdz - gz
 
 # numerical integration
-#lnp = integrate.cumtrapz(dlnpdz, np.cos(TT) * RR, axis=1, initial=0) - \
-#      integrate.cumtrapz(dlnpdz, RR * np.sin(TT), axis=0, initial=0)
-Tp = np.pi/2 - TT[::-1]
-#lnp = integrate.cumtrapz(dlnpdz * np.cos(Tp), RR, axis=1, initial=0) - \
-#      integrate.cumtrapz(dlnpdz * RR * np.sin(Tp), Tp, axis=0, initial=0)
-
-#lnp = integrate.cumtrapz(dlnpdz * (-RR * np.sin(TT) - rcyl / np.tan(TT)**2), TT, axis=0, initial=0)
-#
-
-#lnp = integrate.cumtrapz(dlnpdz * np.sin(Tp), RR, axis=1, initial=0) + \
-#      integrate.cumtrapz(dlnpdz * RR * np.cos(Tp), Tp, axis=0, initial=0)
-
-lnp = integrate.cumtrapz(-dlnpdz * RR / np.sin(TT), TT, axis=0, initial=0)
-
-lnp_test = integrate.cumtrapz(dlnpdz * np.cos(TT), RR, axis=1, initial=0) - \
-           integrate.cumtrapz(dlnpdz * RR * np.sin(TT), TT, axis=0, initial=0)
-
+#lnp = integrate.cumtrapz(-dlnpdz * RR / np.sin(TT), TT, axis=0, initial=0)
+lnp = integrate.cumtrapz(dlnpdz * np.cos(TT), RR, axis=1, initial=0) - \
+      integrate.cumtrapz(dlnpdz * RR * np.sin(TT), TT, axis=0, initial=0)
 
 rho0 = np.exp(lnp)
 lnp_new = lnp
-
-
-# normalize
-Rc, sig0, pg1 = d_args["Rc"] * AU, d_args["sig0"], d_args["pg1"]
-pg2 = d_args["pg2"]
-sigg = powerlaw(RR, sig0, -pg1, Rc) * np.exp(-(RR / Rc)**pg2)
-norm_intsA = integrate.trapz(-rho0 * rcyl * np.cos(Tp) / (np.sin(Tp))**2, Tp, axis=0)
-norm_ints2 = integrate.trapz(rho0 * RR * np.sin(Tp), Tp, axis=0)
-
-integral = integrate.trapz(rho0 * (RR * np.sin(Tp) - rcyl * np.cos(Tp)/np.sin(Tp)**2), Tp, axis=0)
-
-nrhog = 0.5 * sigg * rho0 / integral
-
-
-
-# clip
-nrhog = np.clip(nrhog, min_dens * mu * m_p, max_dens * mu * m_p)
-
 
 
 
@@ -303,7 +271,7 @@ clist1 = ['b', 'C0', 'c']
 clist2 = ['r', 'C3', 'm']
 ind = [300, 200, 100]
 for i in range(len(ind)):
-    plt.plot(0.5*np.pi - TT[:,ind[i]], lnp_new[:,ind[i]] - lnp_new[-1,ind[i]], clist1[i]) 
+    plt.plot(0.5*np.pi - TT[:,ind[i]], lnp_new[:,ind[i]], clist1[i]) 
     print(lnp_orig[-1,ind[i]], lnp_new[-1,ind[i]], RR[0,ind[i]]/AU)
     plt.plot(0.5*np.pi - TT[:,ind[i]], lnp_orig[:,ind[i]], ':'+clist2[i])
 

@@ -243,11 +243,11 @@ class plotutils:
         R = self.Rgrid / self.AU
         THETA = 0.5*np.pi - self.Tgrid[::-1]
         VEL = self.vel[::-1]
-        toplot = np.vstack([VEL[::-1], VEL]) / 1e5
+        toplot = np.log10(np.vstack([VEL[::-1], VEL]) / 1e5)
         yaxis = np.concatenate([-THETA[::-1], THETA])
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(0., 6.5, 50)
+        levels = np.linspace(0, 1.5, 50)
         levels = contourf_kwargs.pop("levels", levels)
         cmap = contourf_kwargs.pop("cmap", "viridis")
         im = ax.contourf(R, yaxis, toplot, levels=levels, cmap=cmap,
@@ -257,7 +257,7 @@ class plotutils:
         cax = cax.append_axes("right", size="4.5%" if full else "3%",
                               pad="2.25%" if full else "1.5%")
         cb = plt.colorbar(im, cax=cax)
-        cb.set_label(r"$v_{\phi} \,\, [{\rm km/s}]$", rotation=270,
+        cb.set_label(r"$\log{v_{\phi}} \,\, [{\rm km/s}]$", rotation=270,
                      labelpad=15)
 
         self._gentrify_structure_ax(ax, full=full)
