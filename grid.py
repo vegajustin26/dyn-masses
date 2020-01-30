@@ -193,7 +193,3 @@ class grid:
             os.system('cp moldata/'+conf_params["molecule"]+'.dat ' + \
                       self.modeldir + \
                       'molecule_'+conf_params["molecule"]+'.inp')
-
-
-
-

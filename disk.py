@@ -6,8 +6,6 @@ import scipy.constants as sc
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-
 from scipy import integrate 
 from scipy.interpolate import interp1d
 
@@ -39,183 +37,80 @@ class disk:
         self.setups = config["setup"]
         conf.close()
 
-
         # stellar properties
         self.mstar = self.host_params["M_star"] * self.msun
 
-
-        # grid properties
+        # grid properties (spherical coordinate system)
         self.rvals, self.tvals = grid.r_centers, grid.t_centers
         self.nr, self.nt = grid.nr, grid.nt
         self.rr, self.tt = np.meshgrid(self.rvals, self.tvals)
 
-        # cylindrical quantities
+        # corresponding cylindrical quantities
         self.rcyl = self.rr * np.sin(self.tt)
         self.zcyl = self.rr * np.cos(self.tt)
 
 
-        # structure setups
-        self.temperature = np.zeros_like(self.rcyl)
-        self.gradT = np.zeros_like(self.rcyl)
-        self.temp_args = self.disk_params["temperature"]["arguments"]
-
-        if self.setups["incl_lines"]:
-            self.rhog = np.zeros_like(self.rcyl)
-            rho_args = self.disk_params["gas_surface_density"]["arguments"]
-            nmol_args = self.disk_params["abundance"]["arguments"]
-            sub_args = self.disk_params["substructure"]["arguments"]
-            self.dens_args = {**rho_args, **self.temp_args, **nmol_args, 
-                              **sub_args}
-            self.nmol = np.zeros_like(self.rcyl)
-            self.vel = np.zeros_like(self.rcyl)
-            self.vel_args = self.disk_params["rotation"]["arguments"]
-            self.turb = np.zeros_like(self.rcyl)
-            self.turb_args = self.disk_params["turbulence"]["arguments"]
-
-            if writestruct:
-                # file headers
-                rhog_inp = open(modelname+'/gas_density.inp', 'w')
-                rhog_inp.write('1\n%d\n' % (self.nr * self.nt))
-                temp_inp = open(modelname+'/gas_temperature.inp', 'w')
-                temp_inp.write('1\n%d\n' % (self.nr * self.nt))
-                tgrad_inp = open(modelname+'/gas_tempgradient.inp', 'w')
-                tgrad_inp.write('1\n%d\n' % (self.nr * self.nt))
-                mname = self.setups["molecule"]
-                nmol_inp = open(modelname+'/numberdens_'+mname+'.inp', 'w')
-                nmol_inp.write('1\n%d\n' % (self.nr * self.nt))
-                vel_inp = open(modelname+'/gas_velocity.inp', 'w')
-                vel_inp.write('1\n%d\n' % (self.nr * self.nt))
-                turb_inp = open(modelname+'/microturbulence.inp', 'w')
-                turb_inp.write('1\n%d\n' % (self.nr * self.nt))
-
-        if self.setups["incl_dust"]:
-            self.rhod = np.zeros_like(self.rcyl)
-            d_args = self.disk_params["dust_surface_density"]["arguments"]
-            self.rhod_args = {**d_args, **self.temp_args}
-
-            if writestruct:
-                rhod_inp = open(modelname+'/dust_density.inp', 'w')
-                rhod_inp.write('1\n%d\n1\n' % (self.nr * self.nt))
-                tdust_inp = open(modelname+'/dust_temperature.dat', 'w')
-                tdust_inp.write('1\n%d\n1\n' % (self.nr * self.nt))
+        # compute gas temperature structure
+        self.T_args = self.disk_params["temperature"]["arguments"]
+        self.temp = self.temperature(**self.T_args)
+        self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
 
 
-#        rr = 97. * self.AU
-#        tt = np.pi/2. - 0.05
-#        r = rr * np.sin(tt)
-#        z = rr * np.cos(tt)
-#        vel = self.velocity(r, z, **self.vel_args)
-#        sys.exit()
+        # compute density structure
+        self.sigma_g = self._parse_function("surface_density",
+                           self.disk_params["gas_surface_density"])
 
 
 
-        # structure (and output) loop
-        for j in range(len(self.tvals)):
-            for i in range(len(self.rvals)):
-
-                # cylindrical quantities
-                r = self.rr[j,i] * np.sin(self.tt[j,i])
-                z = self.rr[j,i] * np.cos(self.tt[j,i])
-
-                # temperature
-                self.temperature[j,i] = self.Temp(r, z, **self.temp_args)
-                self.gradT[j,i] = self.Tgrad_z(r, z, **self.temp_args)
-
-                if self.setups["incl_lines"]:
-                    # gas density and number density (of given molecule)
-                    self.rhog[j,i], self.nmol[j,i] = self.Density_g(r, z, 
-                                                         **self.dens_args)
-
-                    # orbital motion
-                    self.vel[j,i] = self.velocity(r, z, **self.vel_args)
-
-                    # microturbulence
-                    self.turb[j,i] = self.vturb(r, z, **self.turb_args)
-
-                    # write into structure files
-                    if writestruct:
-                        temp_inp.write('%.6e\n' % self.temperature[j,i])
-                        tgrad_inp.write('%.6e\n' % self.gradT[j,i])
-                        rhog_inp.write('%.6e\n' % self.rhog[j,i])
-                        nmol_inp.write('%.6e\n' % self.nmol[j,i])
-                        vel_inp.write('0 0 %.6e\n' % self.vel[j,i])
-                        turb_inp.write('%.6e\n' % self.turb[j,i])
-
-                if self.setups["incl_dust"]:
-                    # dust density
-                    self.rhod[j,i] = self.Density_d(r, z, **self.rhod_args)
-             
-                    # write into structure files
-                    if writestruct:
-                        tdust_inp.write('%.6e\n' % self.temperature[j,i])
-                        rhod_inp.write('%.6e\n' % self.rhod[j,i])
+    # Generic wrapper functions to parse arguments.
+    def _parse_function(self, func_family, user_input):
+        func = user_input["type"]
+        try:
+            args = user_input["arguments"]
+        except KeyError:
+            args = {}
+        return eval("self._{}_{}(**args)".format(func_family, func))
 
 
 
-        # close structure files                
-        if writestruct:
-            if self.setups["incl_lines"]:
-                temp_inp.close()
-                tgrad_inp.close()
-                rhog_inp.close()
-                nmol_inp.close()
-                vel_inp.close()
-                turb_inp.close()
-            if self.setups["incl_dust"]:
-                tdust_inp.close()
-                rhod_inp.close()
+    # Temperature Structure.
 
-
-
-    # Temperature functions.
-
-    def Temp(self, r, z, **args):
-
+    def temperature(self, r=None, z=None, **args):
         # Dartois et al. 2003 (type II)
-        if self.disk_params["temperature"]["type"] == 'dartois':
+        if (self.disk_params["temperature"]["type"] == 'dartois'):
             try:
-                r0, T0mid = args["rT0"] * self.AU, args["T0mid"]
-                T0atm = args.pop("T0atm", T0mid)
-                Tqmid = args["Tqmid"]
-                Tqatm = args.pop("Tqatm", Tqmid)
-                delta = args.pop("delta", 2.0)
-                ZqHp = args.pop("ZqHp", 4.0)
+                r0 = args["rT0"] * self.AU
+                T0mid, Tqmid = args["T0mid"], args["Tqmid"]
+                T0atm, Tqatm = args.pop("T0atm", T0mid), args.pop("Tqatm", Tqmid)
+                delta, ZqHp = args.pop("delta", 2.0), args.pop("ZqHp", 4.0)
             except KeyError:
                 raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
+            r = self.rcyl if r is None else r
+            z = self.zcyl if z is None else z
             Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
             Tatm = self.powerlaw(r, T0atm, Tqatm, r0)
-            zatm = ZqHp * self.scaleheight(r, T=Tmid)
-            T = Tatm + (Tmid - Tatm) * \
-                (np.cos(np.pi * z / (2*zatm)))**(2*delta)
-            if (z.size > 1):
-                T[z >= zatm] = Tatm
-                T[T > self.max_temp] = self.max_temp
-                T[T <= self.min_temp] = self.min_temp
-            else:
-                if (z >= zatm): T = Tatm
-                if (T > self.max_temp): T = self.max_temp
-                if (T <= self.min_temp): T = self.min_temp
-            return T
+            zatm = ZqHp * self.scaleheight(r=r, T=Tmid)
+            T = np.cos(np.pi * z / 2.0 / zatm)**(2 * delta)
+            T = np.where(abs(z) < zatm, (Tmid - Tatm) * T, 0.0)
+            return T + Tatm
 
         # vertically isothermal
-        if self.disk_params["temperature"]["type"] == 'isothermal':
+        if (self.disk_params["temperature"]["type"] == 'isoz'):
             try:
-                r0, T0mid = args["rT0"], args["T0mid"]
-                Tqmid = args["Tqmid"]
+                r0 = args["rT0"] * self.AU
+                T0mid, Tqmid = args["T0mid"], args["Tqmid"]
             except KeyError:
                 raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
-            return self.powerlaw(r, T0mid, Tqmid, r0)
+            return self.powerlaw(self.r, T0mid, Tqmid, r0)
 
 
-    def scaleheight(self, r, T=None):
-        """ Midplane gas pressure scale height """
-        T = self.Temp if T is None else T
-        Hp2 = self.kB * T * r**3 / (self.G * self.mstar * self.mu * self.m_p)
-        return np.sqrt(Hp2) 
+    def scaleheight(self, r=None, T=None):
+        T = self.temperature if T is None else T
+        r = self.rcyl if r is None else r
+        return self.soundspeed(T=T) / np.sqrt(self.G * self.mstar / r**3)
 
 
     def soundspeed(self, T=None):
-        """ Gas soundspeed in [cm/s] """
         T = self.temperature if T is None else T
         return np.sqrt(self.kB * T / self.mu / self.m_p)
 
@@ -254,93 +149,35 @@ class disk:
 
 
        
-    # Density functions.
+    # Density Structure.
 
-    def Sigma_d(self, r, **args):
-
-        # power-law
-        if self.disk_params["dust_surface_density"]["type"] == 'powerlaw':
+    def sigma_g(self, r=None, **args):
+    
+        # Similarity-solution
+        if self.disk_params["gas_surface_density"]["type"] == 'self-similar':
             try:
-                rdedge, sigd0 = args["rdedge"] * self.AU, args["sigd0"]
-                pd1 = args["pd1"]
-            except KeyError:
-                raise ValueError("Specify at least `rdedge`, `sigd0`, `pd1`.")
-            sigd = self.powerlaw(r, sigd0, -pd1, rdedge)
-            if (r > rdedge): 
-                return 0
-            else:
-                if self.setups["substruct"]:
-                    # impose substructures
-                    rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"]
-                    depl = 0.0
-                    for ig in range(len(rgaps)):
-                        rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                        depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
-                    sigd /= (1. + depl)
-
-                return sigd
-
-
-    def Sigma_g(self, r, **args):
-
-        # similarity solution
-        if self.disk_params["gas_surface_density"]["type"] == 'self_similar':
-            try:
-                Rc, sig0, pg1 = args["Rc"] * self.AU, args["sig0"], args["pg1"]
-                pg2 = args.pop("pg2", 2.0 - pg1)
+                Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
+                p2 = args.pop("p2", 2.-p1)
             except KeyError:
                 raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
-            sigg = self.powerlaw(r, sig0, -pg1, Rc) * np.exp(-(r / Rc)**pg2)
+            r = self.rvals if r is None else r
+            return self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
 
-            if self.setups["substruct"]:
-                # impose substructures
-                rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"] 
-                depl = 0.0
-                for ig in range(len(rss)):
-                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
-                sigg /= (1. + depl)
-
-            return sigg
-
-        # power-law
+        # Power-law
         if self.disk_params["gas_surface_density"]["type"] == 'powerlaw':
             try:
-                redge, sig0 = args["redge"] * self.AU, args["sig0"]
-                pg1 = args["pg1"]
+                Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
+                p2 = args.pop("p2", 10.)
             except KeyError:
-                raise ValueError("Specify `redge`, `sig0`, `pg1`.")
-            sigg = self.power(r, sig0, -pg1, redge)
-            if (r > redge):
-                return 0
-            else:
-                if self.setups["substruct"]:
-                    # impose substructures
-                    rss, wss, dss = args["rgaps"], args["wgaps"], args["dgaps"]
-                    depl = 0.0
-                    for ig in range(len(rgaps)):
-                        rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
-                        depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
-                    sigg /= (1. + depl)
+                raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
+            r = self.rvals if r is None else r
+            sig_in  = self.powerlaw(r, sig0, -p1, Rc)
+            sig_out = self.powerlaw(r, sig0, -p2, Rc)
+            sig = np.where(abs(r) < Rc, sig_in, sig_out)
+            return sig
 
-                return sigg
-
-
-    def Density_d(self, r, z, **args):
-
-        # define a dust scale height
-        r0, T0mid, Tqmid = args["rT0"] * self.AU, args["T0mid"], args["Tqmid"]
-        Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
-        zdust = args.pop("hdust", 1.0) * self.scaleheight(r, T=Tmid)
-
-        # use it to define vertical dimension
-        dnorm = self.Sigma_d(r, **args) / (np.sqrt(2 * np.pi) * zdust)
-        return dnorm * np.exp(-0.5 * (z / zdust)**2)
-
-
-    def Density_g(self, r, z, **args):
-
-        """ Gas densities """
+        
+    def _density_hydrostatic(self, r=None, z=None, **args):
 
         # define a special z grid for integration (zg)
         zmin, zmax, nz = 0.1, 5.*r, 1024
@@ -349,7 +186,6 @@ class disk:
         # if z >= zmax, return the minimum density
         if (z >= zmax): 
             rhoz = self.min_dens * self.m_p * self.mu
-
             try:
                 xmol = args["xmol"]
             except KeyError:
@@ -359,7 +195,7 @@ class disk:
 
         else:
             # vertical temperature profile
-            Tz = self.Temp(r, zg, **args)
+            Tz = self.temperature(r, zg, **args)
 
             # vertical temperature gradient
             dlnTdz = self.Tgrad_z(r, zg, **args)

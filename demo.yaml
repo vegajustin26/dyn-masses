@@ -46,17 +46,17 @@ disk_params:
     substructure:
         type: 'gaps'
         arguments:
-            rgaps: [10., 48., 86., 145.]
-            wgaps: [1.4, 9., 7., 6.]
-            dgaps: [10., 30., 50., 100.]
+            rgaps: []
+            wgaps: []
+            dgaps: []
         
     gas_surface_density:
         type: 'self_similar'
         arguments:
             Rc: 150.
             sig0: 30.
-            pg1: 0.75
-            pg2: 1.50
+            p1: 0.75
+            p2: 1.50
 
     dust_surface_density:
         type: 'powerlaw'
@@ -66,7 +66,7 @@ disk_params:
             pd1: 0.5
             hdust: 0.5
 
-    temperature:
+    temperature:        # options = {dartois, isoz}
         type: 'dartois'
         arguments:
             rT0: 30.

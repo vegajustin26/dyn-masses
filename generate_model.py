@@ -19,11 +19,18 @@ sim_grid = grid(model_name)
 # generate a model structure on that grid
 print('making structure')
 t0 = time.time()
-sim_disk = disk(model_name, sim_grid)
+sim_disk = disk(model_name, sim_grid, writestruct=False)
 print(time.time()-t0)
 
+#print(sim_disk._temperature_dartois(r=1.496e15, z=np.array([0., 1.496e13]), **sim_disk.disk_params["temperature"]["arguments"]))
+
+T = sim_disk.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
+
+
+print(sim_disk.scaleheight(r=1.496e15, T=T) / 1.496e15)
+
 #print('plotting structures')
-_ = plotutils(model_name)
+_ = plotutils(model_name, struct=sim_disk)
 sys.exit()
 
 # raytrace out a set of channel maps
