@@ -57,8 +57,12 @@ class disk:
 
 
         # compute density structure
-        self.sigma_g = self._parse_function("surface_density",
-                           self.disk_params["gas_surface_density"])
+        self.sig_args = self.disk_params["gas_surface_density"]["arguments"]
+        self.sigg = self.sigma_gas(**self.sig_args)
+        self.rho_args = {**self.sig_args, **self.T_args, 
+                         **self.disk_params["abundance"]["arguments"]}
+        self.rhogas, self.nmol = self.density_gas(**self.rho_args)
+        print(self.rhogas / self.m_p / self.mu)
 
 
 
@@ -115,46 +119,13 @@ class disk:
         return np.sqrt(self.kB * T / self.mu / self.m_p)
 
 
-    def Tgrad_z(self, r, z, **args):
 
-        # Dartois et al. 2003 (type II)
-        if self.disk_params["temperature"]["type"] == 'dartois':
-            try:
-                r0, T0mid = args["rT0"] * self.AU, args["T0mid"]
-                T0atm = args.pop("T0atm", T0mid)
-                Tqmid = args["Tqmid"]
-                Tqatm = args.pop("Tqatm", Tqmid)
-                delta = args.pop("delta", 2.0)
-                ZqHp = args.pop("ZqHp", 4.0)
-            except KeyError:
-                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
-            Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
-            Tatm = self.powerlaw(r, T0atm, Tqatm, r0)
-            zatm = ZqHp * self.scaleheight(r, T=Tmid)
-            T = Tatm + (Tmid - Tatm) * \
-                (np.cos(np.pi * z / (2*zatm)))**(2*delta)
-            dT = -2 * delta * (Tmid - Tatm) * \
-                 (np.cos(np.pi * z / (2*zatm)))**(2*delta-1) * \
-                 np.sin(np.pi * z / (2*zatm)) * np.pi / (2 * zatm) / T
-            if (z.size > 1):
-                dT[z >= zatm] = 0
-            else:
-                if (z >= zatm): dT = 0
-            return dT
-
-        # vertically isothermal
-        if self.disk_params["temperature"]["type"] == 'isothermal':
-            return 0
-
-
-
-       
     # Density Structure.
 
-    def sigma_g(self, r=None, **args):
+    def sigma_gas(self, r=None, **args):
     
         # Similarity-solution
-        if self.disk_params["gas_surface_density"]["type"] == 'self-similar':
+        if self.disk_params["gas_surface_density"]["type"] == 'self_similar':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 2.-p1)
@@ -177,106 +148,118 @@ class disk:
             return sig
 
         
-    def _density_hydrostatic(self, r=None, z=None, **args):
+    def density_gas(self, r=None, z=None, **args):
 
-        # define a special z grid for integration (zg)
-        zmin, zmax, nz = 0.1, 5.*r, 1024
-        zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz) - zmin
+        # default scenario is to cycle through spherical grid
+        if r is None:
+            rho_gas = np.zeros((self.nt, self.nr))
+            nmol = np.zeros((self.nt, self.nr))
+            for i in range(self.nr):
+                for j in range(self.nt):
 
-        # if z >= zmax, return the minimum density
-        if (z >= zmax): 
-            rhoz = self.min_dens * self.m_p * self.mu
-            try:
-                xmol = args["xmol"]
-            except KeyError:
-                print("Specify at least `xmol`.")
-            abund = xmol * args.pop("depletion", 1e-8)
-            nmol = abund * rhoz / self.m_p / self.mu
+                    # cylindrical coordinates
+                    r, z = self.rcyl[j,i], self.zcyl[j,i]
 
-        else:
-            # vertical temperature profile
-            Tz = self.temperature(r, zg, **args)
+                    # define a special z grid for integration (zg)
+                    zmin, zmax, nz = 0.1, 5.*r, 1024
+                    zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz) 
+                    zg -= zmin
 
-            # vertical temperature gradient
-            dlnTdz = self.Tgrad_z(r, zg, **args)
+                    # if z >= zmax, return the minimum density
+                    if (z >= zmax): 
+                        rho_gas[j,i] = self.min_dens * self.m_p * self.mu
+                        try:
+                            xmol = args["xmol"]
+                        except KeyError:
+                            print("Specify at least `xmol`.")
+                        abund = xmol * args.pop("depletion", 1e-8)
+                        nmol[j,i] = abund * rho_gas[j,i] / self.m_p / self.mu
+
+                    else:
+                        # vertical temperature profile
+                        Tz = self.temperature(r, zg, **args)
+
+                        # vertical temperature gradient
+                        dT = np.diff(np.log(Tz))
+                        dz = np.diff(zg)
+                        dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
                 
-            # vertical gravity
-            gz = self.G * self.mstar * zg / (self.soundspeed(T=Tz))**2
-            gz /= np.hypot(r, zg)**3
+                        # vertical gravity
+                        gz = self.G * self.mstar * zg / self.soundspeed(T=Tz)**2
+                        gz /= np.hypot(r, zg)**3
 
-            # vertical density gradient
-            dlnpdz = -dlnTdz - gz
+                        # vertical density gradient
+                        dlnpdz = -dlnTdz - gz
 
-            # numerical integration
-            lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
-            rho0 = np.exp(lnp)
+                        # numerical integration
+                        lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
+                        rho0 = np.exp(lnp)
 
-            # normalize
-            rho = 0.5 * self.Sigma_g(r, **args) * \
-                  rho0 / integrate.trapz(rho0, zg)
+                        # normalize
+                        rho = 0.5 * rho0 * self.sigma_gas(r=r, **args)
+                        rho /= integrate.trapz(rho0, zg)
 
-            # set up an interpolator for going back to the original gridpoint
-            f = interp1d(zg, rho) 
+                        # interpolator to go back to the original gridpoint
+                        f = interp1d(zg, rho) 
 
-            # gas density at specified height
-            rhoz = np.max([f(z), self.min_dens * self.m_p * self.mu])
-
-
-            """ Molecular (number) densities """
-
-            try:
-                xmol = args["xmol"]
-            except KeyError:
-                print("Specify at least `xmol`.")
-
-            # 'chemical' setup, with constant abundance in a layer between the 
-            # freezeout temperature and photodissociation column
-            if self.disk_params["abundance"]["type"] == 'chemical':
-
-                # find the index of the nearest z cell
-                index = np.argmin(np.abs(zg-z))
-
-                # integrate the vertical density profile *down* to that height
-                sig_index = integrate.trapz(rho[index:], zg[index:])
-                NH2_index = sig_index / self.m_p / self.mu
-
-                # note the column density for photodissociation
-                Npd = 10.**(args.pop("logNpd", 21.11))
-
-                # note the freezeout temperature
-                Tfreeze = args.pop("tfreeze", 21.0)
-
-                # compute abundance
-                if ((NH2_index >= Npd) & 
-                    (self.Temp(r, z, **self.temp_args) >= Tfreeze)):
-                    abund = xmol
-                else: abund = xmol * args.pop("depletion", 1e-8)
-
-            # 'layer' setup, with constant abundance in a layer between 
-            # specified radial and height (z / r) bounds
-            if self.disk_params["abundance"]["type"] == 'layer':
-
-                # identify the layer heights
-                zrmin = args.pop("zrmin", 0.0)
-                zrmax = args.pop("zrmax", 1.0)
-
-                # identify the layer radii
-                rmin = args.pop("rmin", self.rcyl.min()) * self.AU
-                rmax = args.pop("rmax", self.rcyl.max()) * self.AU
-
-                # compute abundance
-                if ((r > rmin) & (r <= rmax) & (z/r > zrmin) & (z/r <= zrmax)):
-                    abund = xmol
-                else: abund = xmol * args.pop("depletion", 1e-8)
+                        # gas density at specified height
+                        rho_gas[j,i] = np.max([f(z), 
+                                           self.min_dens * self.m_p * self.mu])
 
 
-            # molecular number density
-            nmol = rhoz * abund / self.m_p / self.mu
+                        """ Molecular (number) densities """
+                        try:
+                            xmol = args["xmol"]
+                        except KeyError:
+                            print("Specify at least `xmol`.")
 
+                        # 'chemical' setup, with constant abundance in a layer 
+                        # between the freezeout temperature and 
+                        # photodissociation column
+                        if self.disk_params["abundance"]["type"] == 'chemical':
 
-        return rhoz, nmol
+                            # find the index of the nearest z cell
+                            index = np.argmin(np.abs(zg-z))
 
+                            # integrate the vertical density profile *down* to  
+                            # that height
+                            sig_index = integrate.trapz(rho[index:], zg[index:])
+                            NH2_index = sig_index / self.m_p / self.mu
 
+                            # note the column density for photodissociation
+                            Npd = 10.**(args.pop("logNpd", 21.11))
+
+                            # note the freezeout temperature
+                            Tfreeze = args.pop("tfreeze", 21.0)
+
+                            # compute the molecular abundance
+                            if ((NH2_index >= Npd) & 
+                                (self.temperature(r, z, **args) >= Tfreeze)):
+                                abund = xmol
+                            else: abund = xmol * args.pop("depletion", 1e-8)
+
+                        # 'layer' setup, with constant abundance in a layer 
+                        # between specified radial and height (z / r) bounds
+                        if self.disk_params["abundance"]["type"] == 'layer':
+
+                            # identify the layer heights
+                            zrmin = args.pop("zrmin", 0.0)
+                            zrmax = args.pop("zrmax", 1.0)
+
+                            # identify the layer radii
+                            rmin = args.pop("rmin", self.rcyl.min()) * self.AU
+                            rmax = args.pop("rmax", self.rcyl.max()) * self.AU
+
+                            # compute abundance
+                            if ((r > rmin) & (r <= rmax) & 
+                                (z/r > zrmin) & (z/r <= zrmax)):
+                                abund = xmol
+                            else: abund = xmol * args.pop("depletion", 1e-8)
+
+                        # molecular number density
+                        nmol[j,i] = rho_gas[j,i] * abund / self.m_p / self.mu
+
+        return rho_gas, nmol
 
 
 
