@@ -22,7 +22,7 @@ class disk:
 
     # fixed values
     min_dens = 1e0  # minimum gas density in [H2/cm**3]
-    max_dens = 1e20  # maximum gas density in [H2/cm**3]
+    max_dens = 1e20 # maximum gas density in [H2/cm**3]
     min_temp = 5e0  # minimum temperature in [K]
     max_temp = 5e2  # maximum temperature in [K]
 
@@ -32,13 +32,12 @@ class disk:
         # load parameters
         conf = open(modelname + ".yaml")
         config = yaml.load(conf, Loader=yaml.FullLoader)
-        self.host_params = config["host_params"]
-        self.disk_params = config["disk_params"]
-        self.setups = config["setup"]
+        self.hostpars = config["host_params"]
+        self.diskpars = config["disk_params"]
         conf.close()
 
         # stellar properties
-        self.mstar = self.host_params["M_star"] * self.msun
+        self.mstar = self.hostpars["M_star"] * self.msun
 
         # grid properties (spherical coordinate system)
         self.rvals, self.tvals = grid.r_centers, grid.t_centers
@@ -51,61 +50,55 @@ class disk:
 
 
         # compute gas temperature structure
-        self.T_args = self.disk_params["temperature"]["arguments"]
+        self.T_args = self.diskpars["temperature"]["arguments"]
         self.temp = self.temperature(**self.T_args)
         self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
 
 
         # compute density structure
-        self.sig_args = self.disk_params["gas_surface_density"]["arguments"]
+        self.sig_args = self.diskpars["gas_surface_density"]["arguments"]
         self.sigg = self.sigma_gas(**self.sig_args)
         self.rho_args = {**self.sig_args, **self.T_args, 
-                         **self.disk_params["abundance"]["arguments"]}
+                         **self.diskpars["abundance"]["arguments"]}
         self.rhogas, self.nmol = self.density_gas(**self.rho_args)
-        print(self.rhogas / self.m_p / self.mu)
+
+
+        # compute velocity structure
+        self.vel_args = self.diskpars["rotation"]["arguments"]
+        self.vel = self.velocity(**self.vel_args)
 
 
 
-    # Generic wrapper functions to parse arguments.
-    def _parse_function(self, func_family, user_input):
-        func = user_input["type"]
-        try:
-            args = user_input["arguments"]
-        except KeyError:
-            args = {}
-        return eval("self._{}_{}(**args)".format(func_family, func))
-
-
-
-    # Temperature Structure.
-
+    ### Temperature Structure.
     def temperature(self, r=None, z=None, **args):
+
         # Dartois et al. 2003 (type II)
-        if (self.disk_params["temperature"]["type"] == 'dartois'):
+        if (self.diskpars["temperature"]["type"] == 'dartois'):
             try:
-                r0 = args["rT0"] * self.AU
-                T0mid, Tqmid = args["T0mid"], args["Tqmid"]
-                T0atm, Tqatm = args.pop("T0atm", T0mid), args.pop("Tqatm", Tqmid)
+                r0 = args["r0_T"] * self.AU
+                T0mid, qmid = args["T0mid"], args["qmid"]
+                T0atm, qatm = args.pop("T0atm", T0mid), args.pop("qatm", qmid)
                 delta, ZqHp = args.pop("delta", 2.0), args.pop("ZqHp", 4.0)
             except KeyError:
-                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
+                raise ValueError("Specify at least `r0_T`, `T0mid`, `qmid`.")
             r = self.rcyl if r is None else r
             z = self.zcyl if z is None else z
-            Tmid = self.powerlaw(r, T0mid, Tqmid, r0)
-            Tatm = self.powerlaw(r, T0atm, Tqatm, r0)
+            Tmid = self.powerlaw(r, T0mid, qmid, r0)
+            Tatm = self.powerlaw(r, T0atm, qatm, r0)
             zatm = ZqHp * self.scaleheight(r=r, T=Tmid)
             T = np.cos(np.pi * z / 2.0 / zatm)**(2 * delta)
             T = np.where(abs(z) < zatm, (Tmid - Tatm) * T, 0.0)
             return T + Tatm
 
         # vertically isothermal
-        if (self.disk_params["temperature"]["type"] == 'isoz'):
+        if (self.diskpars["temperature"]["type"] == 'isoz'):
             try:
-                r0 = args["rT0"] * self.AU
-                T0mid, Tqmid = args["T0mid"], args["Tqmid"]
+                r0 = args["r0_T"] * self.AU
+                T0mid, qmid = args["T0mid"], args["qmid"]
             except KeyError:
-                raise ValueError("Specify at least `rT0`, `T0mid`, `Tqmid`.")
-            return self.powerlaw(self.r, T0mid, Tqmid, r0)
+                raise ValueError("Specify at least `rT0`, `T0mid`, `qmid`.")
+            r = self.rcyl if r is None else r
+            return self.powerlaw(r, T0mid, qmid, r0)
 
 
     def scaleheight(self, r=None, T=None):
@@ -125,7 +118,7 @@ class disk:
     def sigma_gas(self, r=None, **args):
     
         # Similarity-solution
-        if self.disk_params["gas_surface_density"]["type"] == 'self_similar':
+        if self.diskpars["gas_surface_density"]["type"] == 'self_similar':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 2.-p1)
@@ -135,7 +128,7 @@ class disk:
             return self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
 
         # Power-law
-        if self.disk_params["gas_surface_density"]["type"] == 'powerlaw':
+        if self.diskpars["gas_surface_density"]["type"] == 'powerlaw':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 10.)
@@ -147,8 +140,40 @@ class disk:
             sig = np.where(abs(r) < Rc, sig_in, sig_out)
             return sig
 
+
+    def sigma_dust(self, r=None, **args):
+
+        # Similarity-solution
+        if self.diskpars["dust_surface_density"]["type"] == 'self_similar':
+            try:
+                Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
+                p2 = args.pop("p2", 2.-p1)
+            except KeyError:
+                raise ValueError("Specify at least `Rc`, `sig0`, `p1`.")
+            r = self.rvals if r is None else r
+            return self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
+
+        # Power-law
+        if self.diskpars["dust_surface_density"]["type"] == 'powerlaw':
+            try:
+                Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
+                p2 = args.pop("p2", 10.)
+            except KeyError:
+                raise ValueError("Specify at least `Rc`, `sig0`, `p1`.")
+            r = self.rvals if r is None else r
+            sig_in  = self.powerlaw(r, sig0, -p1, Rc)
+            sig_out = self.powerlaw(r, sig0, -p2, Rc)
+            sig = np.where(abs(r) < Rc, sig_in, sig_out)
+            return sig
+
         
     def density_gas(self, r=None, z=None, **args):
+
+        try:
+            xmol = args["xmol"]
+        except KeyError:
+            print("Specify at least `xmol`.")
+        depl = args.pop("depletion", 1e-8)
 
         # default scenario is to cycle through spherical grid
         if r is None:
@@ -168,13 +193,8 @@ class disk:
                     # if z >= zmax, return the minimum density
                     if (z >= zmax): 
                         rho_gas[j,i] = self.min_dens * self.m_p * self.mu
-                        try:
-                            xmol = args["xmol"]
-                        except KeyError:
-                            print("Specify at least `xmol`.")
-                        abund = xmol * args.pop("depletion", 1e-8)
+                        abund = xmol * depl
                         nmol[j,i] = abund * rho_gas[j,i] / self.m_p / self.mu
-
                     else:
                         # vertical temperature profile
                         Tz = self.temperature(r, zg, **args)
@@ -185,8 +205,8 @@ class disk:
                         dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
                 
                         # vertical gravity
-                        gz = self.G * self.mstar * zg / self.soundspeed(T=Tz)**2
-                        gz /= np.hypot(r, zg)**3
+                        gz = self.G * self.mstar * zg / np.hypot(r, zg)**3
+                        gz /= self.soundspeed(T=Tz)**2
 
                         # vertical density gradient
                         dlnpdz = -dlnTdz - gz
@@ -203,28 +223,18 @@ class disk:
                         f = interp1d(zg, rho) 
 
                         # gas density at specified height
-                        rho_gas[j,i] = np.max([f(z), 
-                                           self.min_dens * self.m_p * self.mu])
-
+                        min_rho = self.min_dens * self.m_p * self.mu
+                        rho_gas[j,i] = np.max([f(z), min_rho])
 
                         """ Molecular (number) densities """
-                        try:
-                            xmol = args["xmol"]
-                        except KeyError:
-                            print("Specify at least `xmol`.")
-
-                        # 'chemical' setup, with constant abundance in a layer 
-                        # between the freezeout temperature and 
-                        # photodissociation column
-                        if self.disk_params["abundance"]["type"] == 'chemical':
+                        if self.diskpars["abundance"]["type"] == 'chemical':
 
                             # find the index of the nearest z cell
-                            index = np.argmin(np.abs(zg-z))
+                            ix = np.argmin(np.abs(zg-z))
 
-                            # integrate the vertical density profile *down* to  
-                            # that height
-                            sig_index = integrate.trapz(rho[index:], zg[index:])
-                            NH2_index = sig_index / self.m_p / self.mu
+                            # integrate density profile *down* to that height
+                            sig_ix = integrate.trapz(rho[ix:], zg[ix:])
+                            NH2_ix = sig_ix / self.m_p / self.mu
 
                             # note the column density for photodissociation
                             Npd = 10.**(args.pop("logNpd", 21.11))
@@ -233,20 +243,16 @@ class disk:
                             Tfreeze = args.pop("tfreeze", 21.0)
 
                             # compute the molecular abundance
-                            if ((NH2_index >= Npd) & 
+                            if ((NH2_ix >= Npd) & 
                                 (self.temperature(r, z, **args) >= Tfreeze)):
                                 abund = xmol
-                            else: abund = xmol * args.pop("depletion", 1e-8)
+                            else: abund = xmol * depl
 
-                        # 'layer' setup, with constant abundance in a layer 
-                        # between specified radial and height (z / r) bounds
-                        if self.disk_params["abundance"]["type"] == 'layer':
+                        if self.diskpars["abundance"]["type"] == 'layer':
 
-                            # identify the layer heights
+                            # identify the layer heights and radial bounds
                             zrmin = args.pop("zrmin", 0.0)
                             zrmax = args.pop("zrmax", 1.0)
-
-                            # identify the layer radii
                             rmin = args.pop("rmin", self.rcyl.min()) * self.AU
                             rmax = args.pop("rmax", self.rcyl.max()) * self.AU
 
@@ -254,7 +260,7 @@ class disk:
                             if ((r > rmin) & (r <= rmax) & 
                                 (z/r > zrmin) & (z/r <= zrmax)):
                                 abund = xmol
-                            else: abund = xmol * args.pop("depletion", 1e-8)
+                            else: abund = xmol * depl
 
                         # molecular number density
                         nmol[j,i] = rho_gas[j,i] * abund / self.m_p / self.mu
@@ -265,58 +271,35 @@ class disk:
 
     # Dynamical functions.
 
-    def velocity(self, r, z, **args):
+    def velocity(self, r=None, z=None, **args):
 
-        # Keplerian rotation (treating or not the vertical height)
-        vkep2 = self.G * self.mstar * r**2
-        if args.pop("height", True):
-            vkep2 /= np.hypot(r, z)**3
-        else:
-            vkep2 /= r**3
+        # Keplerian rotation 
+        if self.diskpars["rotation"]["type"] == 'keplerian':
 
+            # bulk rotation
+            vkep2 = self.G * self.mstar * self.rcyl**2
+            if args.pop("height", True):
+                vkep2 /= self.rr**3
+            else:
+                vkep2 /= self.rcyl**3
 
-        # radial pressure contribution
-        if args.pop("pressure", False):
+            # radial pressure contribution (presumes you've already calculated
+	    # density and temperature structures)
+            if args.pop("pressure", False):
+                # pressure and (cylindrical) radial gradient
+                P = self.rhogas * self.kB * self.temp / self.m_p / self.mu
+                dPdr = np.gradient(P, self.rvals, axis=1) * np.sin(self.tt) + \
+                       np.gradient(P, self.tvals, axis=0) * np.cos(self.tt) / \
+                       self.rr
+                vprs2 = self.rr * np.sin(self.tt) * dPdr / self.rhogas
 
-            # compute the gas pressure
-            rhogas0, nmol = self.Density_g(r, z, **self.dens_args)
-            Tgas0 = self.Temp(r, z, **self.temp_args)
-            Pgas0 = rhogas0 * self.kB * Tgas0 / self.m_p / self.mu
-
-            # define some neighboring radii
-            n_extra = 6
-            extra_range = 1.2
-            rext = np.logspace(np.log10(r / extra_range), 
-                               np.log10(r * extra_range), 2*n_extra + 1)
- 
-            # compute radial pressure gradient
-            Pgas = np.zeros_like(rext)
-            rhog = np.zeros_like(rext)
-            for ir in range(len(rext)):
-                rhog[ir], nmol = self.Density_g(rext[ir], z, **self.dens_args)
-                Tgas = self.Temp(rext[ir], z, **self.temp_args)
-                Pgas[ir] = rhog[ir] * self.kB * Tgas / self.m_p / self.mu
-            gradP = np.gradient(Pgas, rext)
-            dPdr = gradP[n_extra]
-        #    print(dPdr)
-
-            # calculate pressure perturbation to velocity field
-            if (rhog[n_extra] > 0.):
-                vprs2 = r * dPdr / rhog[n_extra]
             else: vprs2 = 0.0
-        else:
-            vprs2 = 0.0
 
-        #print(vkep2, vprs2, vkep2 + vprs2)
+            # self-gravity
+            vgrv2 = 0.0
 
-
-
-        # self-gravity
-        vgrv2 = 0.0
-
-
-        # return the combined velocity field
-        return np.sqrt(vkep2 + vprs2 + vgrv2)
+            # return the combined velocity field
+            return np.sqrt(vkep2 + vprs2 + vgrv2)
 
 
     def vturb(self, r, z, **args):

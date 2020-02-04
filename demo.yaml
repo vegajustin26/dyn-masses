@@ -61,19 +61,20 @@ disk_params:
     dust_surface_density:
         type: 'powerlaw'
         arguments:
-            rdedge: 150.
-            sigd0: 1.3
-            pd1: 0.5
+            Rc: 150.
+            sig0: 1.3
+            p1: 0.5
+            p2: 10.
             hdust: 0.5
 
     temperature:        # options = {dartois, isoz}
         type: 'dartois'
         arguments:
-            rT0: 30.
+            r0_T: 30.
             T0mid: 30.
-            Tqmid: -0.5
+            qmid: -0.5
             T0atm: 60.
-            Tqatm: -0.5
+            qatm: -0.5
             delta: 1.0
             ZqHp: 4.0
         
