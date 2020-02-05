@@ -23,6 +23,15 @@ class plotutils:
         # if no structure is passed, extract it from files
         if struct is None:
             print('using files')
+
+            # load parameter file
+            conf = open(mname + ".yaml")
+            config = yaml.load(conf, Loader=yaml.FullLoader)
+            self.setup = config["setup"]
+            self.diskpars = config["disk_params"]
+            conf.close()
+
+            # spatial grid
             _ = np.loadtxt(mname+'/amr_grid.inp', skiprows=5, max_rows=1)
             nr, nt = np.int(_[0]), np.int(_[1])
             Rw = np.loadtxt(mname+'/amr_grid.inp', skiprows=6, max_rows=nr+1)
@@ -30,11 +39,38 @@ class plotutils:
             self.Rgrid = 0.5*(Rw[:-1] + Rw[1:])
             self.Tgrid = 0.5*(Tw[:-1] + Tw[1:])
 
+            # gas temperatures
             temp_in = np.loadtxt(mname+'/gas_temperature.inp', skiprows=2)
             self.temp = np.reshape(temp_in, (nt, nr))
-
-            _ = self.plot_temp(full=False)
+            _ = self.plot_temp()
             _.savefig(mname+'/temp.png')
+
+            # gas densities
+            rhog_in = np.loadtxt(mname+'/gas_density.inp', skiprows=2)
+            self.rhog = np.reshape(rhog_in, (nt, nr))
+            _ = self.plot_dens()
+            _.savefig(mname+'/dens.png')
+
+            # molecular volume densities
+            mol = self.setup["molecule"]
+            nmol_in = np.loadtxt(mname+'/numberdens_'+mol+'.inp', skiprows=2)
+            self.nmol = np.reshape(nmol_in, (nt, nr))
+            _ = self.plot_nmol()
+            _.savefig(mname+'/nmol.png')
+
+            # gas velocities
+            vel_in = np.loadtxt(mname+'/gas_velocity.inp', skiprows=2)
+            self.vel = np.reshape(vel_in[:,2], (nt, nr))
+            _ = self.plot_vel()
+            _.savefig(mname+'/vel.png')
+
+            # microturbulence
+            vturb_in = np.loadtxt(mname+'/microturbulence.inp', skiprows=2)
+            self.dvturb = np.reshape(vturb_in, (nt, nr))
+            _ = self.plot_vturb()
+            _.savefig(mname+'/vturb.png')
+
+
 
         # otherwise, just use the passed structure
         else:
@@ -45,16 +81,20 @@ class plotutils:
             self.rhog = struct.rhogas
             self.nmol = struct.nmol
             self.vel = struct.vel
+            self.dvturb = struct.dvturb
 
             if not os.path.exists(mname): os.mkdir(mname)
-            _ = self.plot_temp(full=False)
+            _ = self.plot_temp()
             _.savefig(mname+'/temp.png')
-            _ = self.plot_dens(full=False)
+            _ = self.plot_dens()
             _.savefig(mname+'/dens.png')
-            _ = self.plot_nmol(full=False)
+            _ = self.plot_nmol()
             _.savefig(mname+'/nmol.png')
-            _ = self.plot_vel(full=False)
+            _ = self.plot_vel()
             _.savefig(mname+'/vel.png')
+            _ = self.plot_vturb()
+            _.savefig(mname+'/vturb.png')
+
 
             
 
@@ -68,116 +108,115 @@ class plotutils:
         return fig, ax
 
     @staticmethod
-    def _gentrify_structure_ax(ax, full=True):
+    def _gentrify_structure_ax(ax):
         ax.set_xlim([2., 500])
         ax.set_xscale('log')
         ax.set_ylim([0.0, 0.7])
         ax.set_xlabel("$R$ [au]")
         ax.set_ylabel("$\pi$/2 - $\Theta$")
-        #if not full: ax.set_ylim(0.0, ax.get_ylim()[1])
 
-    def plot_temp(self, fig=None, contourf_kwargs=None, full=True):
+
+    def plot_temp(self, fig=None, contourf_kwargs=None):
         fig, ax = self._grab_axes(fig)
-        xx = self.Rgrid / self.AU
-        yy = 0.5*np.pi - self.Tgrid[::-1]
-        zz = self.temp[::-1]
-        toplot = np.vstack([zz[::-1], zz])
-        yaxis = np.concatenate([-yy[::-1], yy])
+        xx, yy = self.Rgrid / self.AU, 0.5*np.pi - self.Tgrid[::-1]
+        toplot = np.vstack([self.temp, self.temp[::-1]])
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(3, 300, 50)
-        levels = contourf_kwargs.pop("levels", levels)
+        levels = np.linspace(5, 300, 50)
         cmap = contourf_kwargs.pop("cmap", "plasma")
-        im = ax.contourf(xx, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
+        im = ax.contourf(xx, np.concatenate([-yy[::-1], yy]), toplot, 
+                         levels=levels, cmap=cmap, **contourf_kwargs)
 
         cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
+        cax = cax.append_axes("right", size="3%", pad="1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 300, 50))
         cb.set_label(r"$T\,\,[{\rm K}]$", rotation=270, labelpad=15)
 
-        self._gentrify_structure_ax(ax, full=full)
+        self._gentrify_structure_ax(ax)
         return fig
 
-    def plot_dens(self, fig=None, contourf_kwargs=None, full=True):
+
+    def plot_dens(self, fig=None, contourf_kwargs=None):
         fig, ax = self._grab_axes(fig)
-        xx = self.Rgrid / self.AU
-        yy = 0.5*np.pi - self.Tgrid[::-1]
-        zz = self.rhog[::-1]
-        toplot = np.vstack([zz[::-1], zz])
-        toplot = np.log10(toplot / self.m_p / self.mu)
-        yaxis = np.concatenate([-yy[::-1], yy])
+        xx, yy = self.Rgrid / self.AU, 0.5*np.pi - self.Tgrid[::-1]
+        toplot = np.log10(np.vstack([self.rhog, self.rhog[::-1]]) / \
+                          self.m_p / self.mu)
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(0, 14, 50)
-        levels = contourf_kwargs.pop("levels", levels)
-        cmap = contourf_kwargs.pop("cmap", "plasma")
-        im = ax.contourf(xx, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
+        levels = np.linspace(0, 15, 50)
+        cmap = contourf_kwargs.pop("cmap", "bone_r")
+        im = ax.contourf(xx, np.concatenate([-yy[::-1], yy]), toplot, 
+                         levels=levels, cmap=cmap, **contourf_kwargs)
 
         cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
+        cax = cax.append_axes("right", size="3%", pad="1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
         cb.set_label(r"$\log_{10}(n_{\rm H_2}\,\,[{\rm cm^{-3}}])$",
                      rotation=270, labelpad=15)
 
-        self._gentrify_structure_ax(ax, full=full)
+        self._gentrify_structure_ax(ax)
         return fig
 
-    def plot_nmol(self, fig=None, contourf_kwargs=None, full=True):
+
+    def plot_nmol(self, fig=None, contourf_kwargs=None):
         fig, ax = self._grab_axes(fig)
-        xx = self.Rgrid / self.AU
-        yy = 0.5*np.pi - self.Tgrid[::-1]
-        zz = self.nmol[::-1]
-        toplot = np.vstack([zz[::-1], zz])
-        toplot = np.log10(toplot)
-        yaxis = np.concatenate([-yy[::-1], yy])
+        xx, yy = self.Rgrid / self.AU, 0.5*np.pi - self.Tgrid[::-1]
+        toplot = np.log10(np.vstack([self.nmol, self.nmol[::-1]]))
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
-        levels = np.linspace(-12, 12, 50)
-        levels = contourf_kwargs.pop("levels", levels)
+        levels = np.linspace(0, 15, 50)
+        levels += np.log10(self.diskpars["abundance"]["arguments"]["xmol"])
         cmap = contourf_kwargs.pop("cmap", "afmhot_r")
-        im = ax.contourf(xx, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
+        im = ax.contourf(xx, np.concatenate([-yy[::-1], yy]), toplot, 
+                         levels=levels, cmap=cmap, **contourf_kwargs)
 
         cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
+        cax = cax.append_axes("right", size="3%", pad="1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
-        cb.set_label(r"$\log_{10}(n_{\rm CO}\,\,[{\rm cm^{-3}}])$",
-                     rotation=270, labelpad=15)
+        cb.set_label(r"$\log_{10}(n_{\rm " + self.setup["molecule"].upper() + \
+                     r"}\,\,[{\rm cm^{-3}}])$", rotation=270, labelpad=15)
 
-        self._gentrify_structure_ax(ax, full=full)
+        self._gentrify_structure_ax(ax)
         return fig
 
-    def plot_vel(self, fig=None, contourf_kwargs=None, full=True):
+
+    def plot_vel(self, fig=None, contourf_kwargs=None):
         fig, ax = self._grab_axes(fig)
-        xx = self.Rgrid / self.AU
-        yy = 0.5*np.pi - self.Tgrid[::-1]
-        zz = self.vel[::-1]
-        toplot = np.vstack([zz[::-1], zz])
-        toplot = np.log10(toplot / 1e5)
-        yaxis = np.concatenate([-yy[::-1], yy])
+        xx, yy = self.Rgrid / self.AU, 0.5*np.pi - self.Tgrid[::-1]
+        toplot = np.log10(np.vstack([self.vel, self.vel[::-1]]) / 1e5)
 
         contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
-        levels = np.linspace(toplot.min(), toplot.max(), 50)
         levels = np.linspace(0, 1.5, 50)
-        levels = contourf_kwargs.pop("levels", levels)
         cmap = contourf_kwargs.pop("cmap", "viridis")
-        im = ax.contourf(xx, yaxis, toplot, levels=levels,
-                         cmap=cmap, **contourf_kwargs)
+        im = ax.contourf(xx, np.concatenate([-yy[::-1], yy]), toplot, 
+                         levels=levels, cmap=cmap, **contourf_kwargs)
 
         cax = make_axes_locatable(ax)
-        cax = cax.append_axes("right", size="4.5%" if full else "3%",
-                              pad="2.25%" if full else "1.5%")
-        cb = plt.colorbar(im, cax=cax)
+        cax = cax.append_axes("right", size="3%", pad="1.5%")
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 2, 0.5))
         cb.set_label(r"$\log_{10}(v_{\phi})\,\,[{\rm km/s}])$",
                      rotation=270, labelpad=15)
 
-        self._gentrify_structure_ax(ax, full=full)
+        self._gentrify_structure_ax(ax)
+        return fig
+
+
+    def plot_vturb(self, fig=None, contourf_kwargs=None):
+        fig, ax = self._grab_axes(fig)
+        xx, yy = self.Rgrid / self.AU, 0.5*np.pi - self.Tgrid[::-1]
+        toplot = np.log10(np.vstack([self.dvturb, self.dvturb[::-1]]) / 1e5)
+
+        contourf_kwargs = {} if contourf_kwargs is None else contourf_kwargs
+        levels = np.linspace(-3, 0, 50)
+        cmap = contourf_kwargs.pop("cmap", "cool")
+        im = ax.contourf(xx, np.concatenate([-yy[::-1], yy]), toplot, 
+                         levels=levels, cmap=cmap, **contourf_kwargs)
+
+        cax = make_axes_locatable(ax)
+        cax = cax.append_axes("right", size="3%", pad="1.5%")
+        cb = plt.colorbar(im, cax=cax, ticks=np.arange(-3, 0, 0.5))
+        cb.set_label(r"$\log_{10}(\delta v_{\rm turb})\,\,[{\rm km/s}])$",
+                     rotation=270, labelpad=15)
+
+        self._gentrify_structure_ax(ax)
         return fig

@@ -34,6 +34,7 @@ class disk:
         config = yaml.load(conf, Loader=yaml.FullLoader)
         self.hostpars = config["host_params"]
         self.diskpars = config["disk_params"]
+        self.setup = config["setup"]
         conf.close()
 
         # stellar properties
@@ -54,7 +55,6 @@ class disk:
         self.temp = self.temperature(**self.T_args)
         self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
 
-
         # compute density structure
         self.sig_args = self.diskpars["gas_surface_density"]["arguments"]
         self.sigg = self.sigma_gas(**self.sig_args)
@@ -62,10 +62,44 @@ class disk:
                          **self.diskpars["abundance"]["arguments"]}
         self.rhogas, self.nmol = self.density_gas(**self.rho_args)
 
-
         # compute velocity structure
         self.vel_args = self.diskpars["rotation"]["arguments"]
         self.vel = self.velocity(**self.vel_args)
+        self.vturb_args = self.diskpars["turbulence"]["arguments"]
+        self.dvturb = self.vturb(**self.vturb_args)
+
+
+        if writestruct:
+            # open files
+            temp_inp = open(modelname+'/gas_temperature.inp', 'w')
+            rhog_inp = open(modelname+'/gas_density.inp', 'w')
+            mname = self.setup["molecule"]
+            nmol_inp = open(modelname+'/numberdens_'+mname+'.inp', 'w')
+            vel_inp  = open(modelname+'/gas_velocity.inp', 'w')
+            turb_inp = open(modelname+'/microturbulence.inp', 'w')
+
+            # file headers
+            temp_inp.write('1\n%d\n' % (self.nr * self.nt))
+            rhog_inp.write('1\n%d\n' % (self.nr * self.nt))
+            nmol_inp.write('1\n%d\n' % (self.nr * self.nt))
+            vel_inp.write('1\n%d\n' % (self.nr * self.nt))
+            turb_inp.write('1\n%d\n' % (self.nr * self.nt))
+
+            # populate files
+            for j in range(self.nt):
+                for i in range(self.nr):
+                    temp_inp.write('%.6e\n' % self.temp[j,i])
+                    rhog_inp.write('%.6e\n' % self.rhogas[j,i])
+                    nmol_inp.write('%.6e\n' % self.nmol[j,i])
+                    vel_inp.write('0 0 %.6e\n' % self.vel[j,i])
+                    turb_inp.write('%.6e\n' % self.dvturb[j,i])
+
+            # close files
+            temp_inp.close()
+            rhog_inp.close()
+            nmol_inp.close()
+            vel_inp.close()
+            turb_inp.close()
 
 
 
@@ -302,13 +336,13 @@ class disk:
             return np.sqrt(vkep2 + vprs2 + vgrv2)
 
 
-    def vturb(self, r, z, **args):
+    def vturb(self, r=None, z=None, **args):
         try:
             xi = args["xi"]
         except KeyError:
             raise ValueError("Specify at least `xi`.")
         
-        return self.soundspeed(T=self.Temp(r, z, **self.temp_args)) * xi
+        return self.soundspeed(T=self.temp) * xi
 
         
 

@@ -18,10 +18,10 @@ gr = grid(model_name)
 
 # generate a model structure on that grid
 print('making structure')
-t0 = time.time()
-di = disk(model_name, gr, writestruct=False)
-print(time.time()-t0)
-
+#t0 = time.time()
+#di = disk(model_name, gr)
+#print(time.time()-t0)
+#sys.exit()
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 
@@ -29,7 +29,7 @@ print(time.time()-t0)
 #print(di.scaleheight(r=1.496e15, T=T) / 1.496e15)
 
 #print('plotting structures')
-_ = plotutils(model_name, struct=di)
+_ = plotutils(model_name)	#, struct=di)
 sys.exit()
 
 # raytrace out a set of channel maps
