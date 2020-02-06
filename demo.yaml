@@ -14,7 +14,7 @@ grid:
         z_max: 500
         
 setup:
-    incl_dust: 0
+    incl_dust: 1
     incl_lines: 1
     scattering: 'Isotropic'
     camera_tracemode: 'image'

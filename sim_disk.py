@@ -85,6 +85,12 @@ class sim_disk:
                 np.savetxt(modelname+'/numberdens_'+smol+'.inp', 
                            np.ravel(self.nmol), fmt='%.6e', header=hdr, 
                            comments='')
+                # generate supplementary radial profiles
+                prof = list(zip(self.rvals / self.AU, self.sigg, 
+                                self.scaleheight(r=self.rvals, 
+                                                 T=self.temp[-1,:]) / self.AU))
+                np.savetxt(modelname+'/gas_profiles.txt', prof, fmt='%.6e', 
+                           header='rau, sigma_g, hau_mid')
 
             # compute kinematic structure
             self.vel_args = self.diskpars["rotation"]["arguments"]
@@ -100,6 +106,23 @@ class sim_disk:
                 np.savetxt(modelname+'/microturbulence.inp',
                            np.ravel(self.dvturb), fmt='%.6e', header=hdr, 
                            comments='')
+
+        if self.setup["incl_dust"]:
+            # compute dust density
+            self.rhod_args = self.diskpars["dust_surface_density"]["arguments"]
+            self.sigd = self.sigma_dust(**self.rhod_args)
+            self.rhodust = self.density_dust(**self.rhod_args)
+            if writestruct:
+                np.savetxt(modelname+'/dust_density.inp', 
+                           np.ravel(self.rhodust),
+                           fmt='%.6e', header=hdr, comments='')
+                # generate supplementary radial profiles
+                prof = list(zip(self.rvals / self.AU, self.sigd,
+                                self.rhod_args.pop("hdust", 1.) * \
+                                self.scaleheight(r=self.rvals, 
+                                                 T=self.temp[-1,:]) / self.AU))
+                np.savetxt(modelname+'/dust_profiles.txt', prof, fmt='%.6e',
+                           header='rau, sigma_d, hdust')
 
 
 
@@ -302,6 +325,19 @@ class sim_disk:
         return rho_gas, nmol
 
 
+    def density_dust(self, r=None, z=None, **args):
+        r = self.rcyl if r is None else r
+        z = self.zcyl if z is None else z
+
+        # define a characteristic dust height
+        Tmid  = self.temperature(**self.T_args)[-1,:]
+        zdust = args.pop("hdust", 1.) * self.scaleheight(r=r, T=Tmid)
+
+        # a simple vertical structure
+        dnorm = self.sigma_dust(r, **args) / (np.sqrt(2 * np.pi) * zdust)
+        return dnorm * np.exp(-0.5 * (z / zdust)**2)
+
+
 
     # Dynamical functions.
 
@@ -341,8 +377,15 @@ class sim_disk:
             xi = args["xi"]
         except KeyError:
             raise ValueError("Specify at least `xi`.")
+
+        # get molecule mass
+        m_mol = np.loadtxt('moldata/'+self.setup["molecule"]+'.dat',
+                           skiprows=3, max_rows=1) / sc.N_A
+
+        # compute thermal linewidth
+        a_therm = np.sqrt(2 * self.kB * self.temp / m_mol)
         
-        return self.soundspeed(T=self.temp) * xi
+        return a_therm * xi
 
         
 
