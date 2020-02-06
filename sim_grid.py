@@ -4,40 +4,47 @@ import yaml
 import numpy as np
 import scipy.constants as sc
 
-class grid:
+class sim_grid:
+
+    # constants
+    msun = 1.989e33
+    AU = sc.au * 1e2
+    mu = 2.37
+    m_p = sc.m_p * 1e3
+    kB = sc.k * 1e7
+    G = sc.G * 1e3
 
     def __init__(self, modelname, writegrid=True):
 
-        # bookkeeping
-        self.modelname = modelname
-        self.modeldir = modelname + '/'
-
         # load grid parameters 
+        self.modelname = modelname
         conf = open(modelname+'.yaml')
         config = yaml.load(conf, Loader=yaml.FullLoader)
-        self.grid_params = config["grid"]
-        self.disk_pars = config["disk_params"]
+        self.gridpars = config["grid"]
+        self.diskpars = config["disk_params"]
         self.setup = config["setup"]
         conf.close()
 
-        # populate the grids
+        # populate the spatial grids
         if self.setup["substruct"]:
-            args = {**self.grid_params["spatial"], 
-                    **self.disk_pars["substructure"]["arguments"]}
+            args = {**self.gridpars["spatial"], 
+                    **self.diskpars["substructure"]["arguments"]}
             self._read_spatial_grid(args, refine=True)
         else:
-            self._read_spatial_grid(self.grid_params["spatial"]) 
-        self.grid_params["wavelength"] = self.grid_params.pop("wavelength", {})
-        self._read_wavelength_grid(self.grid_params["wavelength"])
-        print('Grids successfully populated.')
+            self._read_spatial_grid(self.gridpars["spatial"]) 
+
+        # populate the wavelength grid
+        if "wavelength" not in self.gridpars: 
+            self.gridpars["wavelength"] = self.gridpars.pop("wavelength", {})
+        self._read_wavelength_grid(self.gridpars["wavelength"])
+
 
         # write out the grids into RADMC3D formats
         if writegrid:
-            if not os.path.exists(self.modeldir): os.mkdir(self.modeldir)
+            if not os.path.exists(self.modelname): os.mkdir(self.modelname)
             self.write_wavelength_grid()
             self.write_spatial_grid()
             self.write_config_files()
-
 
 
 
@@ -46,11 +53,11 @@ class grid:
         # number of cells
         self.nr = params["nr"]
         self.nt = params["nt"]
-        self.np = params["np"]
+        self.np = params.pop("np", 1)
 
         # radial grid in [cm]
-        self.r_in = params["r_min"] * sc.au * 1e2
-        self.r_out = params["r_max"] * sc.au * 1e2
+        self.r_in  = params["r_min"] * self.AU
+        self.r_out = params["r_max"] * self.AU
         self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
                                    self.nr+1)
         self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
@@ -62,8 +69,8 @@ class grid:
             dr = 3.0	# sigma
 
             for ig in range(ngaps):
-                rg = rgaps[ig] * sc.au * 1e2
-                wg = wgaps[ig] * sc.au * 1e2
+                rg = rgaps[ig] * self.AU
+                wg = wgaps[ig] * self.AU
                 reg = ((self.r_walls > (rg - dr * wg)) & 
                        (self.r_walls < (rg + dr * wg)))
                 if (len(self.r_walls[reg]) < 60):
@@ -104,7 +111,6 @@ class grid:
 
 
     def _read_wavelength_grid(self, params):
-        """ Populate the wavelength grid in [microns] """
         self.nw = params.get("nw", 100)
         self.logw_min = params.get("logw_min", -1.0)
         self.logw_max = params.get("logw_max", 4.0)
@@ -112,10 +118,8 @@ class grid:
 
 
     def write_wavelength_grid(self, fileout='wavelength_micron.inp'):
-        """ Write the wavelength grid to file """
-        header = '100\n'
-        np.savetxt(self.modeldir + fileout, self.w_centers, header=header,
-                   comments='')
+        np.savetxt(self.modelname + '/' + fileout, self.w_centers, 
+                   header=str(self.nw) + '\n', comments='')
 
 
     def write_spatial_grid(self, fileout='amr_grid.inp'):
@@ -123,73 +127,80 @@ class grid:
         header = '1\n0\n100\n0\n1 1 0\n'
         header += '{:d} {:d} {:d}'.format(self.nr, self.nt, self.np)
         tosave = np.concatenate([self.r_walls, self.t_walls, self.p_walls])
-        np.savetxt(self.modeldir + fileout, tosave, header=header,
+        np.savetxt(self.modelname + '/' + fileout, tosave, header=header,
                    comments='')
 
 
     def write_config_files(self, fileout='radmc3d.inp'):
+
         """ Write the RADMC3D configuration files """
-
-        # Read in the .yaml file
-        conf = open(self.modelname + '.yaml')
-        conf_params = yaml.load(conf, Loader=yaml.FullLoader)["setup"]
-        conf.close()
-
         # open file
-        f = open(self.modeldir + fileout, 'w')
+        f = open(self.modelname + '/' + fileout, 'w')
 
-        # configuration contents
-        f.write('incl_dust = %d\n' % conf_params["incl_dust"])
-        f.write('incl_lines = %d\n' % conf_params["incl_lines"])
-        f.write('incl_freefree = %d\n' % conf_params["incl_freefree"])
-        if conf_params["scattering"] == 'None':
+        # spectral line, continuum, or both
+        f.write('incl_dust = %d\n' % self.setup["incl_dust"])
+        f.write('incl_lines = %d\n' % self.setup["incl_lines"])
+        f.write('incl_freefree = %d\n' % self.setup.pop("incl_freefree", 0))
+
+        # treatment of (continuum) scattering
+        if self.setup["scattering"] == 'None':
             f.write('scattering_mode_max= %d \n' % 0)
-        elif conf_params["scattering"] == 'Isotropic':
+        elif self.setup["scattering"] == 'Isotropic':
             f.write('scattering_mode_max= %d\n' % 1)
             f.write('nphot_scat=2000000\n')
-        elif conf_params["scattering"] == 'HG':
+        elif self.setup["scattering"] == 'HG':
             f.write('scattering_mode_max = %d \n' % 2)
             f.write('nphot_scat=10000000\n')
-        elif conf_params["scattering"] == 'Mueller':
+        elif self.setup["scattering"] == 'Mueller':
             f.write('scattering_mode_max = %d \n' % 3)
             f.write('nphot_scat=100000000\n')
-        if conf_params["binary"]:
+
+        # select ascii or binary storage
+        if "binary" not in self.setup: self.setup["binary"] = False
+        if self.setup["binary"]:
             f.write('writeimage_unformatted = 1\n')
             f.write('rto_single = 1\n')
             f.write('rto_style = 3\n')
         else:
             f.write('rto_style = 1\n')
-        if conf_params["camera_tracemode"]=='image':
+
+        # raytrace intensities or optical depths
+        if "camera_tracemode" not in self.setup: 
+            self.setup["camera_tracemode"] = 'image'
+        if self.setup["camera_tracemode"] == 'image':
             f.write('camera_tracemode = 1\n')
-        elif conf_params["camera_tracemode"]=='tau':
+        elif self.setup["camera_tracemode"] == 'tau':
             f.write('camera_tracemode = -2\n')
-        if conf_params["lines_mode"]=='LTE':
-            f.write('lines_mode = 1\n')
+
+        # LTE excitation calculations (hard-coded)
+        f.write('lines_mode = 1\n')
+
         f.close()
 
+
         ### DUST CONFIG FILE
-        if (conf_params["incl_dust"] == 1):
-            f = open(self.modeldir + 'dustopac.inp', 'w')
+        if (self.setup["incl_dust"] == 1):
+            f = open(self.modelname + '/' + 'dustopac.inp', 'w')
             f.write('2\n1\n')
             f.write('============================================================================\n')
             f.write('1\n0\n')
-            f.write('%s\n' % conf_params["dustspec"])
+            f.write('%s\n' % self.setup["dustspec"])
             f.write('----------------------------------------------------------------------------')
             f.close()
 
             # copy appropriate opacity file
-            os.system('cp opacs/dustkappa_'+conf_params["dustspec"]+'.inp ' + \
-                      self.modeldir)
+            os.system('cp opacs/dustkappa_'+self.setup["dustspec"]+'.inp ' + \
+                      self.modelname + '/')
 
 
         ### LINE DATA CONFIG FILE
-        if (conf_params["incl_lines"] == 1):
-            f = open(self.modeldir + 'lines.inp', 'w')
+        if (self.setup["incl_lines"] == 1):
+            f = open(self.modelname + '/lines.inp', 'w')
             f.write('2\n1\n')
-            f.write('%s    leiden    0    0    0' % conf_params["molecule"])
+            f.write('%s    leiden    0    0    0' % self.setup["molecule"])
             f.close()
 
             # copy appropriate molecular data file
-            os.system('cp moldata/'+conf_params["molecule"]+'.dat ' + \
-                      self.modeldir + \
-                      'molecule_'+conf_params["molecule"]+'.inp')
+            os.system('cp moldata/' + self.setup["molecule"]+'.dat ' + \
+                      self.modelname + \
+                      '/molecule_' + self.setup["molecule"]+'.inp')

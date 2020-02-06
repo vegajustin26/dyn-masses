@@ -3,8 +3,8 @@ import sys
 import os
 import time
 import yaml
-from grid import grid
-from disk import disk
+from sim_grid import sim_grid
+from sim_disk import sim_disk
 from plotutils import plotutils
 from fitsconversion import convert_to_fits
 from raytrace_maps import raytrace_maps
@@ -13,15 +13,10 @@ from raytrace_maps import raytrace_maps
 model_name = 'demo'
 
 
-# generate the spatial grid
-gr = grid(model_name)
-
-# generate a model structure on that grid
 print('making structure')
-#t0 = time.time()
-#di = disk(model_name, gr)
-#print(time.time()-t0)
-#sys.exit()
+t0 = time.time()
+di = sim_disk(model_name)
+print(time.time()-t0)
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 

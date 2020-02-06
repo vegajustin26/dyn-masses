@@ -8,9 +8,10 @@ from matplotlib.ticker import MultipleLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import integrate 
 from scipy.interpolate import interp1d
+from sim_grid import sim_grid
 
 
-class disk:
+class sim_disk:
 
     # constants
     msun = 1.989e33
@@ -27,7 +28,10 @@ class disk:
     max_temp = 5e2  # maximum temperature in [K]
 
 
-    def __init__(self, modelname, grid, writestruct=True):
+    def __init__(self, modelname, grid=None, writestruct=True):
+
+        # if no grid passed, make one
+        if grid is None: grid = sim_grid(modelname, writegrid=writestruct)
 
         # load parameters
         conf = open(modelname + ".yaml")
@@ -49,57 +53,53 @@ class disk:
         self.rcyl = self.rr * np.sin(self.tt)
         self.zcyl = self.rr * np.cos(self.tt)
 
+        # default header for outputs
+        hdr = '1\n%d' % (self.nr * self.nt)
+        smol = self.setup["molecule"]
 
-        # compute gas temperature structure
+
+        # compute temperature structure (presumes Tgas = Tdust)
         self.T_args = self.diskpars["temperature"]["arguments"]
         self.temp = self.temperature(**self.T_args)
         self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
-
-        # compute density structure
-        self.sig_args = self.diskpars["gas_surface_density"]["arguments"]
-        self.sigg = self.sigma_gas(**self.sig_args)
-        self.rho_args = {**self.sig_args, **self.T_args, 
-                         **self.diskpars["abundance"]["arguments"]}
-        self.rhogas, self.nmol = self.density_gas(**self.rho_args)
-
-        # compute velocity structure
-        self.vel_args = self.diskpars["rotation"]["arguments"]
-        self.vel = self.velocity(**self.vel_args)
-        self.vturb_args = self.diskpars["turbulence"]["arguments"]
-        self.dvturb = self.vturb(**self.vturb_args)
-
-
         if writestruct:
-            # open files
-            temp_inp = open(modelname+'/gas_temperature.inp', 'w')
-            rhog_inp = open(modelname+'/gas_density.inp', 'w')
-            mname = self.setup["molecule"]
-            nmol_inp = open(modelname+'/numberdens_'+mname+'.inp', 'w')
-            vel_inp  = open(modelname+'/gas_velocity.inp', 'w')
-            turb_inp = open(modelname+'/microturbulence.inp', 'w')
+            if self.setup["incl_lines"]:
+                np.savetxt(modelname+'/gas_temperature.inp', 
+                           np.ravel(self.temp), fmt='%.6e', header=hdr, 
+                           comments='')
+            if self.setup["incl_dust"]:
+                np.savetxt(modelname+'/dust_temperature.inp', 
+                           np.ravel(self.temp), fmt='%.6e', header=hdr, 
+                           comments='')
 
-            # file headers
-            temp_inp.write('1\n%d\n' % (self.nr * self.nt))
-            rhog_inp.write('1\n%d\n' % (self.nr * self.nt))
-            nmol_inp.write('1\n%d\n' % (self.nr * self.nt))
-            vel_inp.write('1\n%d\n' % (self.nr * self.nt))
-            turb_inp.write('1\n%d\n' % (self.nr * self.nt))
+        if self.setup["incl_lines"]:
+            # compute gas density + molecular abundance structure
+            self.sigg_args = self.diskpars["gas_surface_density"]["arguments"]
+            self.sigg = self.sigma_gas(**self.sigg_args)
+            self.rhog_args = {**self.sigg_args, **self.T_args, 
+                              **self.diskpars["abundance"]["arguments"]}
+            self.rhogas, self.nmol = self.density_gas(**self.rhog_args)
+            if writestruct:
+                np.savetxt(modelname+'/gas_density.inp', np.ravel(self.rhogas),
+                           fmt='%.6e', header=hdr, comments='')
+                np.savetxt(modelname+'/numberdens_'+smol+'.inp', 
+                           np.ravel(self.nmol), fmt='%.6e', header=hdr, 
+                           comments='')
 
-            # populate files
-            for j in range(self.nt):
-                for i in range(self.nr):
-                    temp_inp.write('%.6e\n' % self.temp[j,i])
-                    rhog_inp.write('%.6e\n' % self.rhogas[j,i])
-                    nmol_inp.write('%.6e\n' % self.nmol[j,i])
-                    vel_inp.write('0 0 %.6e\n' % self.vel[j,i])
-                    turb_inp.write('%.6e\n' % self.dvturb[j,i])
-
-            # close files
-            temp_inp.close()
-            rhog_inp.close()
-            nmol_inp.close()
-            vel_inp.close()
-            turb_inp.close()
+            # compute kinematic structure
+            self.vel_args = self.diskpars["rotation"]["arguments"]
+            self.vel = self.velocity(**self.vel_args)
+            self.vturb_args = self.diskpars["turbulence"]["arguments"]
+            self.dvturb = self.vturb(**self.vturb_args)
+            if writestruct:
+                vgas = np.ravel(self.vel)
+                foos = np.zeros_like(vgas)
+                np.savetxt(modelname+'/gas_velocity.inp', 
+                           list(zip(foos, foos, vgas)),
+                           fmt='%.6e', header=hdr, comments='')
+                np.savetxt(modelname+'/microturbulence.inp',
+                           np.ravel(self.dvturb), fmt='%.6e', header=hdr, 
+                           comments='')
 
 
 
