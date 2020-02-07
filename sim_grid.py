@@ -26,12 +26,13 @@ class sim_grid:
         conf.close()
 
         # populate the spatial grids
-        if self.setup["substruct"]:
+        """ Manual (radial) refinement if there are substructures """
+        if self.diskpars["substructure"]["type"] == 'None':
+            self._read_spatial_grid(self.gridpars["spatial"])
+        else:
             args = {**self.gridpars["spatial"], 
                     **self.diskpars["substructure"]["arguments"]}
             self._read_spatial_grid(args, refine=True)
-        else:
-            self._read_spatial_grid(self.gridpars["spatial"]) 
 
         # populate the wavelength grid
         if "wavelength" not in self.gridpars: 
@@ -48,39 +49,56 @@ class sim_grid:
 
 
 
-    def _read_spatial_grid(self, params, refine=False):
+    def _read_spatial_grid(self, args, refine=False):
         """ Populate the spatial grid in spherical polar coordinates """
         # number of cells
-        self.nr = params["nr"]
-        self.nt = params["nt"]
-        self.np = params.pop("np", 1)
+        self.nr, self.nt, self.np = args["nr"], args["nt"], args.pop("np", 1)
 
         # radial grid in [cm]
-        self.r_in  = params["r_min"] * self.AU
-        self.r_out = params["r_max"] * self.AU
+        self.r_in  = args["r_min"] * self.AU
+        self.r_out = args["r_max"] * self.AU
         self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
                                    self.nr+1)
         self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
                                     axis=0)
 
+        """ Radial refinement if substructures implemented """
         if refine:
-            rgaps, wgaps = params["rgaps"], params["wgaps"]
-            ngaps = len(rgaps)
-            dr = 3.0	# sigma
+            print('possible refinement')
+            # identify substructure features
+            locs, wids = args["locs"], args["wids"]
+            nfeat = len(locs)
 
-            for ig in range(ngaps):
-                rg = rgaps[ig] * self.AU
-                wg = wgaps[ig] * self.AU
-                reg = ((self.r_walls > (rg - dr * wg)) & 
-                       (self.r_walls < (rg + dr * wg)))
-                if (len(self.r_walls[reg]) < 60):
+            # define a refinement boundary characteristic
+            if self.diskpars["substructure"]["type"] == 'gaps_gauss':
+                dr, frac_r = 4.0, 0.004		# sigma
+            elif self.diskpars["substructure"]["type"] == 'gaps_sqr':
+                dr, frac_r = 1.2, 0.0012
+
+            # refine the radial grid around the substructures
+            for ix in range(nfeat):
+                rss, wss = locs[ix] * self.AU, wids[ix] * self.AU
+
+                # condition to be in refinement region:
+                reg = ((self.r_walls > (rss - dr * wss)) & 
+                       (self.r_walls < (rss + dr * wss)))
+                nreg = len(self.r_walls[reg])
+
+                # desired number of cells across feature
+                nrefine = 2 * dr * wss / rss / frac_r
+                
+                # swap in refined cells with linear sampling across feature
+                if (nreg < nrefine):
+                    print('refining...')
                     r_exc = self.r_walls[~reg]
-                    r_add = rg + np.linspace(-dr*wg, dr*wg, 61)
+                    r_add = rss + np.linspace(-dr*wss, dr*wss, nrefine)
                     self.r_walls = np.sort(np.concatenate((r_exc, r_add)))
 
+            # re-compute cell centers and number
             self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
                                         axis=0)
             self.nr = len(self.r_centers)
+            print(self.nr)
 
         assert self.r_centers.size == self.nr
 
@@ -89,9 +107,9 @@ class sim_grid:
         self.ncells = self.nr * self.nt * self.np
 
         # theta (altitude angle from pole toward equator) grid in [rad]
-        self.t_offset = params.get("t_offset", 0.1)
-        self.t_min = params.get("t_min", 0.0) + self.t_offset
-        self.t_max = params.get("t_max", 0.5 * np.pi) + self.t_offset
+        self.t_offset = args.get("t_offset", 0.1)
+        self.t_min = args.get("t_min", 0.0) + self.t_offset
+        self.t_max = args.get("t_max", 0.5 * np.pi) + self.t_offset
         self.t_walls = np.logspace(np.log10(self.t_min), np.log10(self.t_max),
                                    self.nt+1)
         self.t_walls = 0.5 * np.pi + self.t_offset - self.t_walls[::-1]
@@ -102,8 +120,8 @@ class sim_grid:
         assert self.t_centers.size == self.nt
 
         # phi (azimuth angle) grid in [rad]
-        self.p_min = params.get("p_min", 0.0)
-        self.p_max = params.get("p_max", 0.0)
+        self.p_min = args.get("p_min", 0.0)
+        self.p_max = args.get("p_max", 0.0)
         self.p_walls = np.linspace(self.p_min, self.p_max, self.np + 1)
         self.p_centers = np.average([self.p_walls[:-1], self.p_walls[1:]],
                                     axis=0)

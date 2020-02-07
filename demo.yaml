@@ -21,7 +21,6 @@ setup:
     molecule: 'co'
     transition: 2
     dustspec: 'DIANAstandard'
-    substruct: 1
 
 host_params: 
     T_eff: 4786 
@@ -30,13 +29,13 @@ host_params:
 
 disk_params:
     substructure:
-        type: 'gaps'
+        type: 'gaps_gauss'        # options = {None, gaps_gauss, gaps_sqr}
         arguments:
-            rgaps: []
-            wgaps: []
-            dgaps: []
+            locs: [20.]
+            wids: [2.]            # half-widths (or std devs)
+            deps: [100.]
         
-    gas_surface_density:
+    gas_density:
         type: 'self_similar'    # options = {self_similar, powerlaw}
         arguments:
             Rc: 150.
@@ -44,7 +43,7 @@ disk_params:
             p1: 0.75
             p2: 1.50
 
-    dust_surface_density:
+    dust_density:
         type: 'powerlaw'        # options = {self_similar, powerlaw}
         arguments:
             Rc: 150.
@@ -77,14 +76,14 @@ disk_params:
             rmax: 300.0
 
     rotation:
-        type: 'keplerian'
+        type: 'keplerian'       # options = {keplerian}
         arguments:
             height: 1
             pressure: 1
             selfgravity: 0
 
     turbulence:
-        type: 'isotropic'
+        type: 'isotropic'       # options = {isotropic}
         arguments:
             xi: 0.01
 

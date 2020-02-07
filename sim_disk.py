@@ -74,7 +74,8 @@ class sim_disk:
 
         if self.setup["incl_lines"]:
             # compute gas density + molecular abundance structure
-            self.sigg_args = self.diskpars["gas_surface_density"]["arguments"]
+            self.sigg_args = {**self.diskpars["gas_density"]["arguments"],
+                              **self.diskpars["substructure"]["arguments"]}
             self.sigg = self.sigma_gas(**self.sigg_args)
             self.rhog_args = {**self.sigg_args, **self.T_args, 
                               **self.diskpars["abundance"]["arguments"]}
@@ -109,7 +110,8 @@ class sim_disk:
 
         if self.setup["incl_dust"]:
             # compute dust density
-            self.rhod_args = self.diskpars["dust_surface_density"]["arguments"]
+            self.rhod_args = {**self.diskpars["dust_density"]["arguments"],
+                              **self.diskpars["substructure"]["arguments"]}
             self.sigd = self.sigma_dust(**self.rhod_args)
             self.rhodust = self.density_dust(**self.rhod_args)
             if writestruct:
@@ -175,17 +177,38 @@ class sim_disk:
     def sigma_gas(self, r=None, **args):
     
         # Similarity-solution
-        if self.diskpars["gas_surface_density"]["type"] == 'self_similar':
+        if self.diskpars["gas_density"]["type"] == 'self_similar':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 2.-p1)
             except KeyError:
                 raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
             r = self.rvals if r is None else r
-            return self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
+            sig = self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
+
+            # impose any substructures
+            if self.diskpars["substructure"]["type"] == 'gaps_gauss':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                depl = 0.
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                sig /= (1. + depl)
+            if self.diskpars["substructure"]["type"] == 'gaps_sqr':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    sc_cond = (r > (rg-wg)) & (r <= (rg+wg))
+                    if (r.size == 1):
+                        if sc_cond: sig /= dss[ig]
+                    else:
+                        sig[sc_cond] /= dss[ig]
+
+            return sig
+
 
         # Power-law
-        if self.diskpars["gas_surface_density"]["type"] == 'powerlaw':
+        if self.diskpars["gas_density"]["type"] == 'powerlaw':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 10.)
@@ -195,23 +218,55 @@ class sim_disk:
             sig_in  = self.powerlaw(r, sig0, -p1, Rc)
             sig_out = self.powerlaw(r, sig0, -p2, Rc)
             sig = np.where(abs(r) < Rc, sig_in, sig_out)
+
+            # impose any substructures
+            if self.diskpars["substructure"]["type"] == 'gaps_gauss':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                depl = 0.
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                sig /= (1. + depl)
+            if self.diskpars["substructure"]["type"] == 'gaps_sqr':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    sig[(r > (rg-wg)) & (r <= (rg+wg))] /= dss[ig]
+
             return sig
+
 
 
     def sigma_dust(self, r=None, **args):
 
         # Similarity-solution
-        if self.diskpars["dust_surface_density"]["type"] == 'self_similar':
+        if self.diskpars["dust_density"]["type"] == 'self_similar':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 2.-p1)
             except KeyError:
                 raise ValueError("Specify at least `Rc`, `sig0`, `p1`.")
             r = self.rvals if r is None else r
-            return self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
+            sig = self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
+
+            # impose any substructures
+            if self.diskpars["substructure"]["type"] == 'gaps_gauss':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                depl = 0.
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                sig /= (1. + depl)
+            if self.diskpars["substructure"]["type"] == 'gaps_sqr':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    sig[(r > (rg-wg)) & (r <= (rg+wg))] /= dss[ig]
+
+            return sig
 
         # Power-law
-        if self.diskpars["dust_surface_density"]["type"] == 'powerlaw':
+        if self.diskpars["dust_density"]["type"] == 'powerlaw':
             try:
                 Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
                 p2 = args.pop("p2", 10.)
@@ -221,6 +276,21 @@ class sim_disk:
             sig_in  = self.powerlaw(r, sig0, -p1, Rc)
             sig_out = self.powerlaw(r, sig0, -p2, Rc)
             sig = np.where(abs(r) < Rc, sig_in, sig_out)
+
+            # impose any substructures
+            if self.diskpars["substructure"]["type"] == 'gaps_gauss':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                depl = 0.
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    depl += (dss[ig] - 1.) * np.exp(-0.5*((r - rg) / wg)**2)
+                sig /= (1. + depl)
+            if self.diskpars["substructure"]["type"] == 'gaps_sqr':
+                rss, wss, dss = args["locs"], args["wids"], args["deps"]
+                for ig in range(len(rss)):
+                    rg, wg = rss[ig] * self.AU, wss[ig] * self.AU
+                    sig[(r > (rg-wg)) & (r <= (rg+wg))] /= dss[ig]
+
             return sig
 
         

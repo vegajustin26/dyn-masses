@@ -178,7 +178,7 @@ class plotutils:
 
     def plot_sigd(self, fig=None):
         fig, ax = self._grab_axes(fig)
-        ax.plot(self.dr, self.dsig, color='C1', lw=3)
+        ax.plot(self.dr, self.dsig, 'C1', lw=3)
         ax.set_xlim([2., 500.])
         ax.set_xscale('log')
         ax.set_ylim([0.8*np.min(self.dsig), 1.2*np.max(self.dsig)])
