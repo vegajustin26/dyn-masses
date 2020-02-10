@@ -13,7 +13,6 @@ def stellarspectrum(teff, lstar, dpc=1.0, grid=None, logg=None, mstar=None,
     Msun = 1.989e33
     pc = 3.08572e18
     GG = 6.67259e-8
-    cc = 2.9979e10
     sigSB = 5.67051e-5
 
     # path to models
@@ -58,29 +57,8 @@ def stellarspectrum(teff, lstar, dpc=1.0, grid=None, logg=None, mstar=None,
         fint = RectBivariateSpline(ggrid, tgrid, spec[:,:,iw])
         ispec[iw] = fint(logg, teff)
 
+    # scale to appropriate distance, Jy units
+    fnu = 1e23 * ispec * (rstar / dcm)**2
 
-    plt.plot(1e-3*wl, spec[2, 27, :], 'r', alpha=0.2)
-    plt.plot(1e-3*wl, spec[3, 28, :], 'b', alpha=0.2)
-    plt.plot(1e-3*wl, ispec, 'k')
-    plt.xlim([0.2, 5])
-    plt.show()
-
-    fspec = 1e23 * ispec * (rstar / dcm)**2
-
-    plt.plot(1e-3*wl, fspec)
-    plt.xlim([0.2, 5])
-    plt.show()
-
-    nu = cc * 1e7 / wl
-    sed = 4. * np.pi * dcm**2 * nu * fspec * 1e-23 / Lsun
-    for i in range(nwl): print(sed[i])
-
-
-    # interpolate in Teff
-    #teff_int = interp1d(tgrid, spec, axis=0)
-    
-
-
-    
-
-
+    # return spectrum and wavelengts as tuple
+    return 1e-3*wl, fnu
