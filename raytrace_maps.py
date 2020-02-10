@@ -24,7 +24,6 @@ class raytrace_maps:
         sizeau = 1.1 * 2 * gridpars["spatial"]["r_max"]
         npix = sizeau / outpars["geometry"]["dpc"] / outpars["spatial"]["ires"]
         npix = np.int(np.ceil(npix / 2) * 2)
-        print(npix)
 
 
         # velocity scale
@@ -37,8 +36,8 @@ class raytrace_maps:
                 np.int(np.ceil(DV0 * nu0 / cc / dnu))
         widthkms = (nchan - 1) * cc * dnu / nu0 / 1e5 / 2 / \
                    outpars["velocity"]["oversample"]
-        widthkms = 20.0
-        nchan = 400
+        widthkms = 15.0
+        nchan = 300
         print(widthkms, nchan)
 
 
@@ -63,3 +62,5 @@ class raytrace_maps:
                             RA=outpars["spatial"]["RA"], 
                             DEC=outpars["spatial"]["DEC"], 
                             downsample=outpars["velocity"]["oversample"])
+
+        os.chdir('../')

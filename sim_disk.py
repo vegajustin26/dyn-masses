@@ -439,7 +439,9 @@ class sim_disk:
             vgrv2 = 0.0
 
             # return the combined velocity field
-            return np.sqrt(vkep2 + vprs2 + vgrv2)
+            vtot2 = vkep2 + vprs2 + vgrv2
+            vtot2[vtot2 < 0] = 0.
+            return np.sqrt(vtot2)
 
 
     def vturb(self, r=None, z=None, **args):

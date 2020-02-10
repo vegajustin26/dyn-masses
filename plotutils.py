@@ -46,6 +46,7 @@ class plotutils:
             self.temp = np.reshape(T_in, (nt, nr))
             _ = self.plot_temp()
             _.savefig(mname+'/temp.png')
+            _.close()
 
             if self.setup["incl_lines"]:
                 # gas densities
@@ -53,6 +54,7 @@ class plotutils:
                 self.rhog = np.reshape(rhog_in, (nt, nr))
                 _ = self.plot_gasdens()
                 _.savefig(mname+'/gasdens.png')
+                _.close()
 
                 # molecular volume densities
                 mol = self.setup["molecule"]
@@ -61,18 +63,21 @@ class plotutils:
                 self.nmol = np.reshape(nmol_in, (nt, nr))
                 _ = self.plot_nmol()
                 _.savefig(mname+'/nmol.png')
+                _.close()
 
                 # gas velocities
                 vel_in = np.loadtxt(mname+'/gas_velocity.inp', skiprows=2)
                 self.vel = np.reshape(vel_in[:,2], (nt, nr))
                 _ = self.plot_vel()
                 _.savefig(mname+'/vel.png')
+                _.close()
 
                 # microturbulence
                 vturb_in = np.loadtxt(mname+'/microturbulence.inp', skiprows=2)
                 self.dvturb = np.reshape(vturb_in, (nt, nr))
                 _ = self.plot_vturb()
                 _.savefig(mname+'/vturb.png')
+                _.close()
 
                 # radial profiles
                 self.gr, self.gsig, self.gH = np.loadtxt(mname + \
@@ -80,8 +85,10 @@ class plotutils:
                                                          skiprows=1).T
                 _ = self.plot_sigg()
                 _.savefig(mname+'/sigma_g.png')
+                _.close()
                 _ = self.plot_Hp()
                 _.savefig(mname+'/Hp.png')
+                _.close()
 
 
             if self.setup["incl_dust"]:
@@ -90,6 +97,7 @@ class plotutils:
                 self.rhod = np.reshape(rhod_in, (nt, nr))
                 _ = self.plot_dustdens()
                 _.savefig(mname+'/dustdens.png')
+                _.close()
 
                 # radial profiles
                 self.dr, self.dsig, self.dH = np.loadtxt(mname + \
@@ -97,8 +105,10 @@ class plotutils:
                                                          skiprows=1).T
                 _ = self.plot_sigd()
                 _.savefig(mname+'/sigma_d.png')
+                _.close()
                 _ = self.plot_Hdust()
                 _.savefig(mname+'/Hdust.png')
+                _.close()
 
 
             if (self.setup["incl_lines"] and self.setup["incl_dust"]):
@@ -106,6 +116,7 @@ class plotutils:
                 _.savefig(mname+'/sigma_dg.png')
                 _ = self.plot_Hboth()
                 _.savefig(mname+'/Hboth.png')
+                _.close()
 
 
 
