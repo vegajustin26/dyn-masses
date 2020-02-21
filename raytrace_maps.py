@@ -38,6 +38,8 @@ class raytrace_maps:
                    outpars["velocity"]["oversample"]
         widthkms = 15.0
         nchan = 300
+        widthkms = 0.15
+        nchan = 3
         print(widthkms, nchan)
 
 

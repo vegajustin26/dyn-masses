@@ -10,12 +10,12 @@ from fitsconversion import convert_to_fits
 from raytrace_maps import raytrace_maps
 
 
-model_name = 'demo_wrt'
+model_name = 'demo_wcyl'
 
-#print('making structure')
-#t0 = time.time()
-#di = sim_disk(model_name)
-#print(time.time()-t0)
+print('making structure')
+t0 = time.time()
+di = sim_disk(model_name, writestruct=False, cyl=True)
+print(time.time()-t0)
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 
@@ -24,6 +24,8 @@ model_name = 'demo_wrt'
 
 #print('plotting structures')
 #_ = plotutils(model_name)	#, struct=di)
+
+sys.exit()
 
 os.chdir(model_name)
 os.system('radmc3d sed ' + \

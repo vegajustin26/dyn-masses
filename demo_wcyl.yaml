@@ -6,8 +6,8 @@ grid:
         r_max: 500
 
     cyl:
-        nr: 2048
-        nz: 2048
+        nr: 512
+        nz: 1024
         r_min: 0.1
         r_max: 500
         z_min: 0.001
@@ -15,8 +15,7 @@ grid:
         
 setup:
     incl_dust: 1
-    incl_lines: 0
-    nphot: 10000000
+    incl_lines: 1
     scattering: 'Isotropic'
     camera_tracemode: 'image'
     molecule: 'co'
@@ -24,17 +23,17 @@ setup:
     dustspec: 'DIANAstandard'
 
 host_params: 
-    T_eff: 9332.
-    L_star: 17.0
-    M_star: 2.04
+    T_eff: 4786 
+    R_star: 0.9 
+    M_star: 1.32 
 
 disk_params:
     substructure:
         type: 'None'        # options = {None, gaps_gauss, gaps_sqr}
         arguments:
-            locs: []
-            wids: []            # half-widths (or std devs)
-            deps: []
+            locs: [20.]
+            wids: [2.]            # half-widths (or std devs)
+            deps: [100.]
         
     gas_density:
         type: 'self_similar'    # options = {self_similar, powerlaw}
@@ -51,10 +50,10 @@ disk_params:
             sig0: 1.3
             p1: 0.5
             p2: 10.
-            hdust: 0.01
+            hdust: 0.5
 
     temperature:        
-        type: 'rt'         # options = {dartois, isoz}
+        type: 'dartois'         # options = {dartois, isoz}
         arguments:
             r0_T: 30.
             T0mid: 30.
@@ -91,7 +90,7 @@ disk_params:
 
 outputs:
     geometry:
-        dpc: 101                # distance in pc
+        dpc: 159                # distance in pc
         PA: 90.0                # PA: of blueshifted major axis (!)
         incl: 120.              # incl: along major axis, "top" is near side if
                                 # incl < 90, "bottom" if incl > 90 

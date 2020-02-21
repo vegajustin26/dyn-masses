@@ -3,18 +3,22 @@ import sys
 import yaml
 import numpy as np
 import scipy.constants as sc
+from scipy.interpolate import interp1d
+from stellarspectrum import stellarspectrum
 
 class sim_grid:
 
     # constants
     msun = 1.989e33
+    lsun = 3.826e33
     AU = sc.au * 1e2
     mu = 2.37
     m_p = sc.m_p * 1e3
     kB = sc.k * 1e7
+    sigSB = 5.67051e-5
     G = sc.G * 1e3
 
-    def __init__(self, modelname, writegrid=True):
+    def __init__(self, modelname, writegrid=True, cyl=False):
 
         # load grid parameters 
         self.modelname = modelname
@@ -22,23 +26,34 @@ class sim_grid:
         config = yaml.load(conf, Loader=yaml.FullLoader)
         self.gridpars = config["grid"]
         self.diskpars = config["disk_params"]
+        self.hostpars = config["host_params"]
         self.setup = config["setup"]
         conf.close()
 
         # populate the spatial grids
         """ Manual (radial) refinement if there are substructures """
         if self.diskpars["substructure"]["type"] == 'None':
-            self._read_spatial_grid(self.gridpars["spatial"])
+            if cyl:
+                self._read_spatial_grid(self.gridpars["cyl"], cyl=cyl)
+            else:
+                self._read_spatial_grid(self.gridpars["spatial"], cyl=cyl)
         else:
-            args = {**self.gridpars["spatial"], 
-                    **self.diskpars["substructure"]["arguments"]}
-            self._read_spatial_grid(args, refine=True)
+            if cyl:
+                args = {**self.gridpars["cyl"],
+                        **self.diskpars["substructure"]["arguments"]}
+            else:
+                args = {**self.gridpars["spatial"], 
+                        **self.diskpars["substructure"]["arguments"]}
+            self._read_spatial_grid(args, refine=True, cyl=cyl)
 
         # populate the wavelength grid
         if "wavelength" not in self.gridpars: 
             self.gridpars["wavelength"] = self.gridpars.pop("wavelength", {})
         self._read_wavelength_grid(self.gridpars["wavelength"])
 
+        # create a stellar spectrum if required
+        if self.diskpars["temperature"]["type"] == 'rt':
+            self._make_starspec(self.hostpars)
 
         # write out the grids into RADMC3D formats
         if writegrid:
@@ -46,13 +61,18 @@ class sim_grid:
             self.write_wavelength_grid()
             self.write_spatial_grid()
             self.write_config_files()
+            if self.diskpars["temperature"]["type"] == 'rt':
+                self.write_starspec()
 
 
 
-    def _read_spatial_grid(self, args, refine=False):
-        """ Populate the spatial grid in spherical polar coordinates """
-        # number of cells
-        self.nr, self.nt, self.np = args["nr"], args["nt"], args.pop("np", 1)
+    def _read_spatial_grid(self, args, refine=False, cyl=False):
+        if cyl:
+            self.nr, self.nz = args["nr"], args["nz"]
+            self.np = args.pop("np", 1)
+        else:
+            self.nr, self.nt = args["nr"], args["nt"]
+            self.np = args.pop("np", 1)
 
         # radial grid in [cm]
         self.r_in  = args["r_min"] * self.AU
@@ -103,21 +123,31 @@ class sim_grid:
         assert self.r_centers.size == self.nr
 
 
-        # number of cells
-        self.ncells = self.nr * self.nt * self.np
+        if cyl:
+            # number of cells
+            self.ncells = self.nr * self.nz * self.np
 
-        # theta (altitude angle from pole toward equator) grid in [rad]
-        self.t_offset = args.get("t_offset", 0.1)
-        self.t_min = args.get("t_min", 0.0) + self.t_offset
-        self.t_max = args.get("t_max", 0.5 * np.pi) + self.t_offset
-        self.t_walls = np.logspace(np.log10(self.t_min), np.log10(self.t_max),
-                                   self.nt+1)
-        self.t_walls = 0.5 * np.pi + self.t_offset - self.t_walls[::-1]
-        self.t_min = self.t_walls.min()
-        self.t_max = self.t_walls.max()
-        self.t_centers = np.average([self.t_walls[:-1], self.t_walls[1:]],
-                                    axis=0)
-        assert self.t_centers.size == self.nt
+            # height from midplane in [cm]
+            self.z_centers = np.logspace(np.log10(args["z_min"]), 
+                                         np.log10(args["z_min"]+args["z_max"]),
+                                         self.nz) - args["z_min"]
+            assert self.z_centers.size == self.nz
+        else:
+            # number of cells
+            self.ncells = self.nr * self.nt * self.np
+
+            # theta (altitude angle from pole toward equator) grid in [rad]
+            self.t_offset = args.get("t_offset", 0.1)
+            self.t_min = args.get("t_min", 0.0) + self.t_offset
+            self.t_max = args.get("t_max", 0.5 * np.pi) + self.t_offset
+            self.t_walls = np.logspace(np.log10(self.t_min), 
+                                       np.log10(self.t_max), self.nt+1)
+            self.t_walls = 0.5 * np.pi + self.t_offset - self.t_walls[::-1]
+            self.t_min = self.t_walls.min()
+            self.t_max = self.t_walls.max()
+            self.t_centers = np.average([self.t_walls[:-1], self.t_walls[1:]],
+                                        axis=0)
+            assert self.t_centers.size == self.nt
 
         # phi (azimuth angle) grid in [rad]
         self.p_min = args.get("p_min", 0.0)
@@ -133,6 +163,25 @@ class sim_grid:
         self.logw_min = params.get("logw_min", -1.0)
         self.logw_max = params.get("logw_max", 4.0)
         self.w_centers = np.logspace(self.logw_min, self.logw_max, self.nw)
+
+
+    def _make_starspec(self, params):
+        teff, lstar, mstar = params["T_eff"], params["L_star"], params["M_star"]
+        swl, sfnu = stellarspectrum(params["T_eff"], params["L_star"], 
+                                    mstar=params["M_star"])
+        sint = interp1d(swl, sfnu)
+        self.Fnu_star = sint(self.w_centers)
+
+
+    def write_starspec(self, fileout='stars.inp'):
+        header = '2\n1    {:d}\n'.format(self.nw)
+        rstar = np.sqrt(self.hostpars["L_star"] * self.lsun / \
+                        (4 * np.pi * self.sigSB * self.hostpars["T_eff"]**4))
+        header += '%.6e   %.6e   0.   0.   0.' % \
+                  (rstar, self.hostpars["M_star"] * self.msun)
+        tosave = np.concatenate((self.w_centers, self.Fnu_star))
+        np.savetxt(self.modelname + '/' + fileout, tosave, header=header,
+                   comments='')
 
 
     def write_wavelength_grid(self, fileout='wavelength_micron.inp'):
@@ -159,6 +208,9 @@ class sim_grid:
         f.write('incl_dust = %d\n' % self.setup["incl_dust"])
         f.write('incl_lines = %d\n' % self.setup["incl_lines"])
         f.write('incl_freefree = %d\n' % self.setup.pop("incl_freefree", 0))
+        f.write('nphot = %d\n' % self.setup.pop("nphot", 1000000))
+        f.write('modified_random_walk = %d\n' % self.setup.pop("mrw", 1))
+        f.write('mc_scat_maxtauabs = 5.d0\n')
 
         # treatment of (continuum) scattering
         if self.setup["scattering"] == 'None':

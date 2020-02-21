@@ -28,10 +28,16 @@ class sim_disk:
     max_temp = 5e2  # maximum temperature in [K]
 
 
-    def __init__(self, modelname, grid=None, writestruct=True):
+    def __init__(self, modelname, grid=None, writestruct=True, cyl=False):
 
         # if no grid passed, make one
-        if grid is None: grid = sim_grid(modelname, writegrid=writestruct)
+        if grid is None: 
+            grid = sim_grid(modelname, writegrid=writestruct, cyl=cyl)
+            print(grid.nz)
+
+        
+
+        sys.exit()
 
         # load parameters
         conf = open(modelname + ".yaml")
@@ -57,26 +63,53 @@ class sim_disk:
         hdr = '1\n%d' % (self.nr * self.nt)
         smol = self.setup["molecule"]
 
+        # passable file name
+        self.modelname = modelname
+
+
+
+        if self.setup["incl_dust"]:
+            # compute dust density
+            self.T_args = self.diskpars["temperature"]["arguments"]
+            self.rhod_args = {**self.diskpars["dust_density"]["arguments"],
+                              **self.diskpars["substructure"]["arguments"],
+                              **self.T_args}
+            self.sigd = self.sigma_dust(**self.rhod_args)
+            self.rhodust = self.density_dust(**self.rhod_args)
+            if writestruct:
+                np.savetxt(modelname+'/dust_density.inp',
+                           np.ravel(self.rhodust),
+                           fmt='%.6e', header=hdr+'\n1', comments='')
+                # generate supplementary radial profiles
+                z_dust = self.zdust(r=self.rvals, **self.rhod_args)
+                prof = list(zip(self.rvals / self.AU, self.sigd, 
+                                z_dust / self.AU))
+                np.savetxt(modelname+'/dust_profiles.txt', prof, fmt='%.6e',
+                           header='rau, sigma_d, hdust')
+
 
         # compute temperature structure (presumes Tgas = Tdust)
         self.T_args = self.diskpars["temperature"]["arguments"]
         self.temp = self.temperature(**self.T_args)
-        self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
         if writestruct:
             if self.setup["incl_lines"]:
                 np.savetxt(modelname+'/gas_temperature.inp', 
                            np.ravel(self.temp), fmt='%.6e', header=hdr, 
                            comments='')
             if self.setup["incl_dust"]:
-                np.savetxt(modelname+'/dust_temperature.inp', 
-                           np.ravel(self.temp), fmt='%.6e', header=hdr, 
-                           comments='')
+                if not self.diskpars["temperature"]["type"] == 'rt':
+                    self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
+                    np.savetxt(modelname+'/dust_temperature.dat', 
+                               np.ravel(self.temp), fmt='%.6e', header=hdr, 
+                               comments='')
+
 
         if self.setup["incl_lines"]:
             # compute gas density + molecular abundance structure
             self.sigg_args = {**self.diskpars["gas_density"]["arguments"],
                               **self.diskpars["substructure"]["arguments"]}
             self.sigg = self.sigma_gas(**self.sigg_args)
+            self.chem_args = self.diskpars["abundance"]["arguments"]
             self.rhog_args = {**self.sigg_args, **self.T_args, 
                               **self.diskpars["abundance"]["arguments"]}
             self.rhogas, self.nmol = self.density_gas(**self.rhog_args)
@@ -107,24 +140,6 @@ class sim_disk:
                 np.savetxt(modelname+'/microturbulence.inp',
                            np.ravel(self.dvturb), fmt='%.6e', header=hdr, 
                            comments='')
-
-        if self.setup["incl_dust"]:
-            # compute dust density
-            self.rhod_args = {**self.diskpars["dust_density"]["arguments"],
-                              **self.diskpars["substructure"]["arguments"]}
-            self.sigd = self.sigma_dust(**self.rhod_args)
-            self.rhodust = self.density_dust(**self.rhod_args)
-            if writestruct:
-                np.savetxt(modelname+'/dust_density.inp', 
-                           np.ravel(self.rhodust),
-                           fmt='%.6e', header=hdr, comments='')
-                # generate supplementary radial profiles
-                prof = list(zip(self.rvals / self.AU, self.sigd,
-                                self.rhod_args.pop("hdust", 1.) * \
-                                self.scaleheight(r=self.rvals, 
-                                                 T=self.temp[-1,:]) / self.AU))
-                np.savetxt(modelname+'/dust_profiles.txt', prof, fmt='%.6e',
-                           header='rau, sigma_d, hdust')
 
 
 
@@ -158,6 +173,15 @@ class sim_disk:
                 raise ValueError("Specify at least `rT0`, `T0mid`, `qmid`.")
             r = self.rcyl if r is None else r
             return self.powerlaw(r, T0mid, qmid, r0)
+
+        # real radiative transfer
+        if (self.diskpars["temperature"]["type"] == 'rt'):
+            os.chdir(self.modelname)
+            os.system('radmc3d mctherm setthreads 4')
+            tdust = np.loadtxt('dust_temperature.dat', skiprows=3)
+            tdust = np.reshape(tdust, (self.nt, self.nr))
+            os.chdir('../')
+            return tdust
 
 
     def scaleheight(self, r=None, T=None):
@@ -301,6 +325,14 @@ class sim_disk:
         except KeyError:
             print("Specify at least `xmol`.")
         depl = args.pop("depletion", 1e-8)
+        if self.diskpars["abundance"]["type"] == 'chemical':
+            Npd = 10.**(args.pop("logNpd", 21.11))
+            Tfreeze = args.pop("tfreeze", 21.)
+        if self.diskpars["abundance"]["type"] == 'layer':
+            zrmin = args.pop("zrmin", 0.0)
+            zrmax = args.pop("zrmax", 1.0)
+            rmin = args.pop("rmin", self.rcyl.min() / self.AU) * self.AU
+            rmax = args.pop("rmax", self.rcyl.max() / self.AU) * self.AU
 
         # default scenario is to cycle through spherical grid
         if r is None:
@@ -363,12 +395,6 @@ class sim_disk:
                             sig_ix = integrate.trapz(rho[ix:], zg[ix:])
                             NH2_ix = sig_ix / self.m_p / self.mu
 
-                            # note the column density for photodissociation
-                            Npd = 10.**(args.pop("logNpd", 21.11))
-
-                            # note the freezeout temperature
-                            Tfreeze = args.pop("tfreeze", 21.0)
-
                             # compute the molecular abundance
                             if ((NH2_ix >= Npd) & 
                                 (self.temperature(r, z, **args) >= Tfreeze)):
@@ -376,12 +402,6 @@ class sim_disk:
                             else: abund = xmol * depl
 
                         if self.diskpars["abundance"]["type"] == 'layer':
-
-                            # identify the layer heights and radial bounds
-                            zrmin = args.pop("zrmin", 0.0)
-                            zrmax = args.pop("zrmax", 1.0)
-                            rmin = args.pop("rmin", self.rcyl.min()) * self.AU
-                            rmax = args.pop("rmax", self.rcyl.max()) * self.AU
 
                             # compute abundance
                             if ((r > rmin) & (r <= rmax) & 
@@ -400,12 +420,31 @@ class sim_disk:
         z = self.zcyl if z is None else z
 
         # define a characteristic dust height
-        Tmid  = self.temperature(**self.T_args)[-1,:]
-        zdust = args.pop("hdust", 1.) * self.scaleheight(r=r, T=Tmid)
+        if self.diskpars["temperature"]["type"] == 'rt':
+            z_dust = self.zdust(r=r, **args)
+        else:
+            Tmid  = self.temperature(**args)[-1,:]
+            z_dust = self.zdust(r=r, T=Tmid, **args)
 
         # a simple vertical structure
-        dnorm = self.sigma_dust(r, **args) / (np.sqrt(2 * np.pi) * zdust)
-        return dnorm * np.exp(-0.5 * (z / zdust)**2)
+        dnorm = self.sigma_dust(r, **args) / (np.sqrt(2 * np.pi) * z_dust)
+        return dnorm * np.exp(-0.5 * (z / z_dust)**2)
+
+
+    def zdust(self, r=None, T=None, **args):
+        T = self.temperature if T is None else T
+        r = self.rcyl if r is None else r
+
+        if self.diskpars["temperature"]["type"] == 'rt':
+            hdust = args.pop("hdust", 0.1)
+            psi = args.pop("psi", 0.2)
+            z_dust = (hdust * r) * (r / (args["Rc"] * self.AU))**psi
+        else:
+            Tmid  = self.temperature(**args)[-1,:]
+            z_dust = args.pop("hdust", 1.) * self.scaleheight(r=r, T=Tmid)
+        
+        return z_dust
+
 
 
 

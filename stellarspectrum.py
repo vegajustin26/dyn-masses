@@ -50,15 +50,20 @@ def stellarspectrum(teff, lstar, dpc=1.0, grid=None, logg=None, mstar=None,
             rstar = np.sqrt(lstar / (4. * np.pi * sigSB * teff**4))
             logg = np.log10(GG * mstar / rstar**2)
 
-
     # bivariate spline interpolation
     ispec = np.empty(nwl)
     for iw in range(nwl):
         fint = RectBivariateSpline(ggrid, tgrid, spec[:,:,iw])
         ispec[iw] = fint(logg, teff)
 
+    # extrapolate the R-J tail out to long wavelengths
+    extra_wl = np.logspace(np.log10(200.), np.log10(50000.), 128) * 1e3
+    extra_ispec = ispec[-1] * (extra_wl / wl[-1])**(-2)
+    fspec = np.concatenate((ispec, extra_ispec))
+    wl = np.concatenate((wl, extra_wl))
+
     # scale to appropriate distance, Jy units
-    fnu = 1e23 * ispec * (rstar / dcm)**2
+    fnu = fspec * (rstar / dcm)**2
 
     # return spectrum and wavelengts as tuple
     return 1e-3*wl, fnu
