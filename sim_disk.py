@@ -33,11 +33,6 @@ class sim_disk:
         # if no grid passed, make one
         if grid is None: 
             grid = sim_grid(modelname, writegrid=writestruct, cyl=cyl)
-            print(grid.nz)
-
-        
-
-        sys.exit()
 
         # load parameters
         conf = open(modelname + ".yaml")
@@ -50,21 +45,28 @@ class sim_disk:
         # stellar properties
         self.mstar = self.hostpars["M_star"] * self.msun
 
-        # grid properties (spherical coordinate system)
-        self.rvals, self.tvals = grid.r_centers, grid.t_centers
-        self.nr, self.nt = grid.nr, grid.nt
-        self.rr, self.tt = np.meshgrid(self.rvals, self.tvals)
+        # grid properties
+        if cyl:
+            # (cylindrical coordinate system)
+            self.rvals, self.zvals = grid.r_centers, grid.z_centers
+            self.nr, self.nz = grid.nr, grid.nz
+            self.rcyl, self.zcyl = np.meshgrid(self.rvals, self.zvals)
+        else:
+            # (spherical coordinate system)
+            self.rvals, self.tvals = grid.r_centers, grid.t_centers
+            self.nr, self.nt = grid.nr, grid.nt
+            self.rr, self.tt = np.meshgrid(self.rvals, self.tvals)
 
-        # corresponding cylindrical quantities
-        self.rcyl = self.rr * np.sin(self.tt)
-        self.zcyl = self.rr * np.cos(self.tt)
+            # corresponding cylindrical quantities
+            self.rcyl = self.rr * np.sin(self.tt)
+            self.zcyl = self.rr * np.cos(self.tt)
 
-        # default header for outputs
-        hdr = '1\n%d' % (self.nr * self.nt)
-        smol = self.setup["molecule"]
+            # default header for outputs
+            hdr = '1\n%d' % (self.nr * self.nt)
 
         # passable file name
         self.modelname = modelname
+        smol = self.setup["molecule"]
 
 
 

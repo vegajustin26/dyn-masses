@@ -15,7 +15,7 @@ grid:
         
 setup:
     incl_dust: 1
-    incl_lines: 1
+    incl_lines: 0
     scattering: 'Isotropic'
     camera_tracemode: 'image'
     molecule: 'co'
