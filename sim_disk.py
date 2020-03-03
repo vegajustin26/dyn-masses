@@ -69,12 +69,15 @@ class sim_disk:
         smol = self.setup["molecule"]
 
 
-
         if self.setup["incl_dust"]:
+            # number of dust species
+            self.ndust = grid.ndust
+
             # compute dust density
             self.T_args = self.diskpars["temperature"]["arguments"]
             self.rhod_args = {**self.diskpars["dust_density"]["arguments"],
                               **self.diskpars["substructure"]["arguments"],
+                              **self.diskpars["dust"]["arguments"],
                               **self.T_args}
             self.sigd = self.sigma_dust(**self.rhod_args)
             self.rhodust = self.density_dust(**self.rhod_args)
@@ -102,8 +105,8 @@ class sim_disk:
                 if not self.diskpars["temperature"]["type"] == 'rt':
                     self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
                     np.savetxt(modelname+'/dust_temperature.dat', 
-                               np.ravel(self.temp), fmt='%.6e', header=hdr, 
-                               comments='')
+                               np.ravel(self.temp), fmt='%.6e', 
+                               header=hdr+'\n1', comments='')
 
 
         if self.setup["incl_lines"]:
@@ -114,7 +117,7 @@ class sim_disk:
             self.chem_args = self.diskpars["abundance"]["arguments"]
             self.rhog_args = {**self.sigg_args, **self.T_args, 
                               **self.diskpars["abundance"]["arguments"]}
-            self.rhogas, self.nmol = self.density_gas(**self.rhog_args)
+            self.rhogas, self.nmol = self.density_gas(cyl=cyl, **self.rhog_args)
             if writestruct:
                 np.savetxt(modelname+'/gas_density.inp', np.ravel(self.rhogas),
                            fmt='%.6e', header=hdr, comments='')
@@ -130,7 +133,7 @@ class sim_disk:
 
             # compute kinematic structure
             self.vel_args = self.diskpars["rotation"]["arguments"]
-            self.vel = self.velocity(**self.vel_args)
+            self.vel = self.velocity(**self.vel_args, cyl=cyl)
             self.vturb_args = self.diskpars["turbulence"]["arguments"]
             self.dvturb = self.vturb(**self.vturb_args)
             if writestruct:
@@ -320,7 +323,7 @@ class sim_disk:
             return sig
 
         
-    def density_gas(self, r=None, z=None, **args):
+    def density_gas(self, r=None, z=None, cyl=False, **args):
 
         try:
             xmol = args["xmol"]
@@ -329,90 +332,146 @@ class sim_disk:
         depl = args.pop("depletion", 1e-8)
         if self.diskpars["abundance"]["type"] == 'chemical':
             Npd = 10.**(args.pop("logNpd", 21.11))
-            Tfreeze = args.pop("tfreeze", 21.)
+            Tfrz = args.pop("tfreeze", 21.)
         if self.diskpars["abundance"]["type"] == 'layer':
             zrmin = args.pop("zrmin", 0.0)
             zrmax = args.pop("zrmax", 1.0)
             rmin = args.pop("rmin", self.rcyl.min() / self.AU) * self.AU
             rmax = args.pop("rmax", self.rcyl.max() / self.AU) * self.AU
 
-        # default scenario is to cycle through spherical grid
+        # default scenario is to cycle through spherical grid; alternative is 
+        # operate on a fixed grid in cylindrical coordinates (if cyl=True)
         if r is None:
-            rho_gas = np.zeros((self.nt, self.nr))
-            nmol = np.zeros((self.nt, self.nr))
-            for i in range(self.nr):
-                for j in range(self.nt):
+            if cyl:
+                # temperature structure
+                T = self.temperature(self.rcyl, self.zcyl, **args)
+             
+                # temperature gradient
+                dT = np.diff(np.log(T), axis=0)
+                dz = np.diff(self.zcyl, axis=0)
+                dlnTdz = np.vstack((dT, dT[-1,:])) / np.vstack((dz, dz[-1,:]))
 
-                    # cylindrical coordinates
-                    r, z = self.rcyl[j,i], self.zcyl[j,i]
+                # vertical gravity
+                gz = self.G * self.mstar * self.zcyl / \
+                     np.hypot(self.rcyl, self.zcyl)**3 / \
+                     self.soundspeed(T=T)**2
 
-                    # define a special z grid for integration (zg)
-                    zmin, zmax, nz = 0.1, 5.*r, 1024
-                    zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz) 
-                    zg -= zmin
+                # vertical density gradient
+                dlnpdz = -dlnTdz - gz
 
-                    # if z >= zmax, return the minimum density
-                    if (z >= zmax): 
-                        rho_gas[j,i] = self.min_dens * self.m_p * self.mu
-                        abund = xmol * depl
-                        nmol[j,i] = abund * rho_gas[j,i] / self.m_p / self.mu
-                    else:
-                        # vertical temperature profile
-                        Tz = self.temperature(r, zg, **args)
+                # numerical integration
+                lnp = integrate.cumtrapz(dlnpdz, self.zcyl, initial=0, axis=0)
+                rho0 = np.exp(lnp)
 
-                        # vertical temperature gradient
-                        dT = np.diff(np.log(Tz))
-                        dz = np.diff(zg)
-                        dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
+                # normalize
+                rho_gas = 0.5 * rho0 * self.sigma_gas(r=self.rcyl, **args)
+                rho_gas /= integrate.trapz(rho0, self.zcyl, axis=0)
+
+                # clip
+                rho_gas = np.clip(rho_gas, self.min_dens * self.m_p * self.mu,
+                                           self.max_dens * self.m_p * self.mu)
+
+                # abundance structure
+                if self.diskpars["abundance"]["type"] == 'chemical':
+                    not_frzn = T > Tfrz
+                    ntemp = rho_gas[::-1] / self.m_p / self.mu
+                    not_diss = integrate.cumtrapz(ntemp, self.zcyl, 
+                                                  axis=0, initial=0)
+                    not_diss = not_diss[::-1] > Npd
+                    abund = np.where(np.logical_and(not_frzn, not_diss), xmol, 
+                                     xmol * depl)
+
+                if self.diskpars["abundance"]["type"] == 'layer':
+                    zr_mask = np.logical_and(self.zcyl / self.rcyl <= zrmax,
+                                             self.zcyl / self.rcyl >= zrmin)
+                    r_mask = np.logical_and(self.rcyl >= rmin, 
+                                            self.rcyl <= rmax)
+                    abund = np.where(np.logical_and(zr_mask, r_mask), xmol, 
+                                     xmol * depl)
+
+                # molecular number density
+                nmol = rho_gas * abund / self.m_p / self.mu
+
+            else:
+                rho_gas = np.zeros((self.nt, self.nr))
+                nmol = np.zeros((self.nt, self.nr))
+                for i in range(self.nr):
+                    for j in range(self.nt):
+
+                        # cylindrical coordinates
+                        r, z = self.rcyl[j,i], self.zcyl[j,i]
+
+                        # define a special z grid for integration (zg)
+                        zmin, zmax, nz = 0.1, 5.*r, 1024
+                        zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), 
+                                         nz) - zmin
+
+                        # if z >= zmax, return the minimum density
+                        if (z >= zmax): 
+                            rho_gas[j,i] = self.min_dens * self.m_p * self.mu
+                            abund = xmol * depl
+                            nmol[j,i] = abund * rho_gas[j,i] / \
+                                        self.m_p / self.mu
+                        else:
+                            # vertical temperature profile
+                            Tz = self.temperature(r=r, z=zg, **args)
+
+                            # vertical temperature gradient
+                            dT = np.diff(np.log(Tz))
+                            dz = np.diff(zg)
+                            dlnTdz = np.append(dT, dT[-1]) / \
+                                     np.append(dz, dz[-1])
                 
-                        # vertical gravity
-                        gz = self.G * self.mstar * zg / np.hypot(r, zg)**3
-                        gz /= self.soundspeed(T=Tz)**2
+                            # vertical gravity
+                            gz = self.G * self.mstar * zg / np.hypot(r, zg)**3
+                            gz /= self.soundspeed(T=Tz)**2
 
-                        # vertical density gradient
-                        dlnpdz = -dlnTdz - gz
+                            # vertical density gradient
+                            dlnpdz = -dlnTdz - gz
 
-                        # numerical integration
-                        lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
-                        rho0 = np.exp(lnp)
+                            # numerical integration
+                            lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
+                            rho0 = np.exp(lnp)
 
-                        # normalize
-                        rho = 0.5 * rho0 * self.sigma_gas(r=r, **args)
-                        rho /= integrate.trapz(rho0, zg)
+                            # normalize
+                            rho = 0.5 * rho0 * self.sigma_gas(r=r, **args)
+                            rho /= integrate.trapz(rho0, zg)
 
-                        # interpolator to go back to the original gridpoint
-                        f = interp1d(zg, rho) 
+                            # interpolator to go back to the original gridpoint
+                            f = interp1d(zg, rho) 
 
-                        # gas density at specified height
-                        min_rho = self.min_dens * self.m_p * self.mu
-                        rho_gas[j,i] = np.max([f(z), min_rho])
+                            # gas density at specified height
+                            min_rho = self.min_dens * self.m_p * self.mu
+                            rho_gas[j,i] = np.max([f(z), min_rho])
 
-                        """ Molecular (number) densities """
-                        if self.diskpars["abundance"]["type"] == 'chemical':
+                            """ Molecular (number) densities """
+                            if self.diskpars["abundance"]["type"] == 'chemical':
 
-                            # find the index of the nearest z cell
-                            ix = np.argmin(np.abs(zg-z))
+                                # find the index of the nearest z cell
+                                ix = np.argmin(np.abs(zg-z))
 
-                            # integrate density profile *down* to that height
-                            sig_ix = integrate.trapz(rho[ix:], zg[ix:])
-                            NH2_ix = sig_ix / self.m_p / self.mu
+                                # integrate *down* to that height
+                                sig_ix = integrate.trapz(rho[ix:], zg[ix:])
+                                NH2_ix = sig_ix / self.m_p / self.mu
 
-                            # compute the molecular abundance
-                            if ((NH2_ix >= Npd) & 
-                                (self.temperature(r, z, **args) >= Tfreeze)):
-                                abund = xmol
-                            else: abund = xmol * depl
+                                # compute the molecular abundance
+                                if ((NH2_ix >= Npd) & 
+                                    (self.temperature(r, z, **args) >= Tfrz)):
+                                    abund = xmol
+                                else: abund = xmol * depl
 
-                        if self.diskpars["abundance"]["type"] == 'layer':
+                            if self.diskpars["abundance"]["type"] == 'layer':
 
-                            # compute abundance
-                            if ((r > rmin) & (r <= rmax) & 
-                                (z/r > zrmin) & (z/r <= zrmax)):
-                                abund = xmol
-                            else: abund = xmol * depl
+                                # compute abundance
+                                if ((r > rmin) & (r <= rmax) & 
+                                    (z/r > zrmin) & (z/r <= zrmax)):
+                                    abund = xmol
+                                else: abund = xmol * depl
 
-                        # molecular number density
-                        nmol[j,i] = rho_gas[j,i] * abund / self.m_p / self.mu
+                            # molecular number density
+                            nmol[j,i] = rho_gas[j,i] * abund / \
+                                        self.m_p / self.mu
+
 
         return rho_gas, nmol
 
@@ -421,16 +480,54 @@ class sim_disk:
         r = self.rcyl if r is None else r
         z = self.zcyl if z is None else z
 
-        # define a characteristic dust height
-        if self.diskpars["temperature"]["type"] == 'rt':
-            z_dust = self.zdust(r=r, **args)
-        else:
-            Tmid  = self.temperature(**args)[-1,:]
-            z_dust = self.zdust(r=r, T=Tmid, **args)
+        # simple case of composite species
+        if self.ndust == 1:
+            # define a characteristic dust height
+            if self.diskpars["temperature"]["type"] == 'rt':
+                z_dust = self.zdust(r=r, **args)
+            else:
+                Tmid  = self.temperature(**args)[-1,:]
+                z_dust = self.zdust(r=r, T=Tmid, **args)
 
-        # a simple vertical structure
-        dnorm = self.sigma_dust(r, **args) / (np.sqrt(2 * np.pi) * z_dust)
-        return dnorm * np.exp(-0.5 * (z / z_dust)**2)
+            # a simple vertical structure
+            dnorm = self.sigma_dust(r, **args) / (np.sqrt(2 * np.pi) * z_dust)
+            rhod = dnorm * np.exp(-0.5 * (z / z_dust)**2)
+
+        else:
+            # define a distribution of size-dependent dust heights
+            if self.diskpars["temperature"]["type"] == 'rt':
+                # load the dust sizes
+                dind, dsize = np.loadtxt('opacs/' + self.setup["dustspec"] + \
+                                         '_sizeindex.txt').T
+                acm = dsize[:self.ndust]
+                lacm = np.log10(acm)
+
+                # a logistic distribution
+                zdust_min = args.pop("hdust", 0.01) * r * \
+                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
+                zdust_max = args.pop("hmax", 0.1) * r * \
+                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
+                testzd = 0.01 + (0.1 - 0.01) / \
+                         (1 + np.exp(np.log10(acm)-np.log10(acm[-1])))
+                plt.semilogx(acm, testzd, 'o')
+                plt.axis([1e-5, 1e-1, 0.01, 0.1])
+                plt.show() 
+                sys.exit()
+                cols = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']
+                zd = np.empty((self.nt, self.nr, self.ndust))
+                for ia in range(6):	#range(len(acm)):
+                    zd[:,:,ia] = zdust_min + (zdust_max - zdust_min) / \
+                                 (1 + np.exp(lacm[ia*3] - lacm[-1]))
+                    print(lacm[ia*3])
+                    plt.plot(r / self.AU, zd[:,:,ia] / self.AU, cols[ia])
+                plt.plot(r / self.AU, zdust_min / self.AU, ':k')
+                plt.plot(r / self.AU, zdust_max / self.AU, ':m')
+                plt.show()
+                sys.exit()
+                z_max = self.zdust(r=r, **args)     
+
+
+        return rhod
 
 
     def zdust(self, r=None, T=None, **args):
@@ -452,7 +549,7 @@ class sim_disk:
 
     # Dynamical functions.
 
-    def velocity(self, r=None, z=None, **args):
+    def velocity(self, r=None, z=None, cyl=False, **args):
 
         # Keplerian rotation 
         if self.diskpars["rotation"]["type"] == 'keplerian':
@@ -460,20 +557,23 @@ class sim_disk:
             # bulk rotation
             vkep2 = self.G * self.mstar * self.rcyl**2
             if args.pop("height", True):
-                vkep2 /= self.rr**3
+                vkep2 /= np.hypot(self.rcyl, self.zcyl)**3
             else:
                 vkep2 /= self.rcyl**3
 
             # radial pressure contribution (presumes you've already calculated
 	    # density and temperature structures)
             if args.pop("pressure", False):
-                # pressure and (cylindrical) radial gradient
                 P = self.rhogas * self.kB * self.temp / self.m_p / self.mu
-                dPdr = np.gradient(P, self.rvals, axis=1) * np.sin(self.tt) + \
-                       np.gradient(P, self.tvals, axis=0) * np.cos(self.tt) / \
-                       self.rr
-                vprs2 = self.rr * np.sin(self.tt) * dPdr / self.rhogas
-
+                if cyl:
+                    dP = np.gradient(P, self.rvals, axis=1)
+                    vprs2 = self.rcyl * dP / self.rhogas
+                else:
+                    dP = np.gradient(P, self.rvals, axis=1)*np.sin(self.tt) + \
+                         np.gradient(P, self.tvals, axis=0)*np.cos(self.tt) / \
+                         self.rr
+                    vprs2 = self.rr * np.sin(self.tt) * dP / self.rhogas
+                vprs2 = np.where(np.isfinite(vprs2), vprs2, 0.0)
             else: vprs2 = 0.0
 
             # self-gravity

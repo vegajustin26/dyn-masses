@@ -15,7 +15,7 @@ grid:
         
 setup:
     incl_dust: 1
-    incl_lines: 0
+    incl_lines: 1
     scattering: 'Isotropic'
     camera_tracemode: 'image'
     molecule: 'co'
@@ -67,11 +67,11 @@ disk_params:
         type: 'chemical'        # options = {chemical, layer}
         arguments:
             xmol: 0.0001
-            depletion: 0.00000001
-            logNpd: 20.699
+            depletion: 0.001
+            logNpd: 19.0
             tfreeze: 19.
-            zrmax: 0.45
-            zrmin: 0.005
+            zrmax: 0.1
+            zrmin: 0.01
             rmin: 1.0
             rmax: 300.0
 

@@ -14,8 +14,10 @@ model_name = 'demo_wcyl'
 
 print('making structure')
 t0 = time.time()
-di = sim_disk(model_name, writestruct=False, cyl=True)
+di = sim_disk(model_name)
 print(time.time()-t0)
+
+_ = plotutils(model_name)
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 
@@ -23,7 +25,10 @@ print(time.time()-t0)
 #print(di.scaleheight(r=1.496e15, T=T) / 1.496e15)
 
 #print('plotting structures')
-#_ = plotutils(model_name)	#, struct=di)
+
+# structure and plot in cylindrical coordinates
+di = sim_disk(model_name, writestruct=False, cyl=True)
+_ = plotutils(model_name, struct=di, cyl=True)	
 
 sys.exit()
 

@@ -128,9 +128,11 @@ class sim_grid:
             self.ncells = self.nr * self.nz * self.np
 
             # height from midplane in [cm]
-            self.z_centers = np.logspace(np.log10(args["z_min"]), 
-                                         np.log10(args["z_min"]+args["z_max"]),
-                                         self.nz) - args["z_min"]
+            self.z_in = args["z_min"] * self.AU
+            self.z_out = args["z_max"] * self.AU
+            self.z_centers = np.logspace(np.log10(self.z_in), 
+                                         np.log10(self.z_in + self.z_out),
+                                         self.nz) - self.z_in
             assert self.z_centers.size == self.nz
         else:
             # number of cells
@@ -250,17 +252,49 @@ class sim_grid:
 
         ### DUST CONFIG FILE
         if (self.setup["incl_dust"] == 1):
-            f = open(self.modelname + '/' + 'dustopac.inp', 'w')
-            f.write('2\n1\n')
-            f.write('============================================================================\n')
-            f.write('1\n0\n')
-            f.write('%s\n' % self.setup["dustspec"])
-            f.write('----------------------------------------------------------------------------')
-            f.close()
+            if self.diskpars["dust"]["type"] == 'composite':
+                self.ndust = 1
+                f = open(self.modelname + '/' + 'dustopac.inp', 'w')
+                f.write('2\n1\n')
+                f.write('============================================================================\n')
+                f.write('1\n0\n')
+                f.write('%s\n' % self.setup["dustspec"])
+                f.write('----------------------------------------------------------------------------')
+                f.close()
 
-            # copy appropriate opacity file
-            os.system('cp opacs/dustkappa_'+self.setup["dustspec"]+'.inp ' + \
-                      self.modelname + '/')
+                # copy appropriate opacity file
+                os.system('cp opacs/dustkappa_' + self.setup["dustspec"] + \
+                          '.inp ' + self.modelname + '/')
+
+            if self.diskpars["dust"]["type"] == 'multi':
+                # load index to size correspondance
+                dind, dsize = np.loadtxt('opacs/' + self.setup["dustspec"] + \
+                                         '_sizeindex.txt').T
+
+                # find index for maximum dust size
+                amax = self.diskpars["dust"]["arguments"]["amax"]
+                dindmax = np.max(dind[dsize <= amax])
+
+                # queue up dust species
+                self.ndust = np.int(dindmax + 1)
+                idust = [str(ix).rjust(2, '0') for ix in range(self.ndust)]
+
+                # generate control file
+                dbarr = '============================================================================'
+                sbarr = '----------------------------------------------------------------------------'
+                f = open(self.modelname + '/' + 'dustopac.inp', 'w')
+                f.write('2\n')
+                f.write(str(self.ndust)+'\n')
+                f.write(dbarr+'\n')
+                for ix in range(self.ndust):
+                    f.write('10\n0\n')
+                    f.write('%s\n' % (self.setup["dustspec"] + '_' + idust[ix]))
+                    f.write(sbarr)
+                    if (ix < self.ndust-1): f.write('\n')
+                    os.system('cp opacs/dustkapscatmat_' + \
+                              self.setup["dustspec"] + '_' + idust[ix] + \
+                              '.inp ' + self.modelname + '/')
+                f.close()
 
 
         ### LINE DATA CONFIG FILE

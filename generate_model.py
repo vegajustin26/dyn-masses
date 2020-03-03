@@ -10,12 +10,14 @@ from fitsconversion import convert_to_fits
 from raytrace_maps import raytrace_maps
 
 
-model_name = 'demo_wrt'
+model_name = 'demo_rt_multisize'
 
-#print('making structure')
-#t0 = time.time()
-#di = sim_disk(model_name)
-#print(time.time()-t0)
+print('making structure')
+t0 = time.time()
+di = sim_disk(model_name)
+print(time.time()-t0)
+
+sys.exit()
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 
