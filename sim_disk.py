@@ -508,20 +508,21 @@ class sim_disk:
                 zdust_max = args.pop("hmax", 0.1) * r * \
                             (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
                 testzd = 0.01 + (0.1 - 0.01) / \
-                         (1 + np.exp(np.log10(acm)-np.log10(acm[-1])))
+                         (1 + np.exp(2.*(lacm-0.5*(lacm[0]+lacm[-1]))))
                 plt.semilogx(acm, testzd, 'o')
                 plt.axis([1e-5, 1e-1, 0.01, 0.1])
                 plt.show() 
-                sys.exit()
-                cols = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']
+                cols = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 
+                        'C9', 'C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 
+                        'C7', 'C8', 'C9', 'C0']
+                lmid_acm = 0.5*(lacm[0]+lacm[-1])
                 zd = np.empty((self.nt, self.nr, self.ndust))
-                for ia in range(6):	#range(len(acm)):
+                for ia in range(len(acm)):
                     zd[:,:,ia] = zdust_min + (zdust_max - zdust_min) / \
-                                 (1 + np.exp(lacm[ia*3] - lacm[-1]))
-                    print(lacm[ia*3])
+                                 (1 + np.exp(2.*(lacm[ia] - lmid_acm)))
                     plt.plot(r / self.AU, zd[:,:,ia] / self.AU, cols[ia])
                 plt.plot(r / self.AU, zdust_min / self.AU, ':k')
-                plt.plot(r / self.AU, zdust_max / self.AU, ':m')
+                plt.plot(r / self.AU, zdust_max / self.AU, ':k')
                 plt.show()
                 sys.exit()
                 z_max = self.zdust(r=r, **args)     
