@@ -14,7 +14,7 @@ model_name = 'demo_wcyl'
 
 print('making structure')
 t0 = time.time()
-di = sim_disk(model_name)
+di = sim_disk(model_name, cyl=True)
 print(time.time()-t0)
 
 _ = plotutils(model_name)

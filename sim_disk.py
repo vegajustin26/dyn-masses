@@ -515,12 +515,15 @@ class sim_disk:
                 pdust = args.pop("pdust", 3.5)
 
                 # masses and mass bin gradients
-                mgrain = 4 * np.pi * rho_s * acm**3 / 3
-                mgrainw = np.zeros(self.ndust + 1)
+                lacm_p = np.append(lacm, [lacm[0] - np.average(np.diff(lacm)),
+                                   lacm[-1] + np.average(np.diff(lacm))])
+                acm_p = 10.**np.sort(lacm_p)
+                mgrain = 4 * np.pi * rho_s * acm_p**3 / 3
+                mgrainw = np.zeros(self.ndust + 3)
                 mgrainw[1:-1] = np.sqrt(mgrain[1:] * mgrain[:-1])
-                mgrainw[0] = mgrain[0]
-                mgrainw[-1] = mgrain[-1]
                 dmgrain = mgrainw[1:] - mgrainw[:-1]
+                dmgrain = dmgrain[1:-1]
+                mgrain = mgrain[1:-1]
 
                 # size distribution weights
                 massdist = mgrain**((-pdust - 2) / 3)
@@ -532,19 +535,17 @@ class sim_disk:
                 sigd = self.sigma_dust(r, **args)
 
                 # compute normalized density distributions
-                sigd_a = np.empty((self.nt, self.nr, self.ndust))
-                zd = np.empty((self.nt, self.nr, self.ndust))
-                rhod = np.empty((self.nt, self.nr, self.ndust))
+                nrad, nvert = np.shape(r)[1], np.shape(r)[0]
+                sigd_a = np.empty((nvert, nrad, self.ndust))
+                zd = np.empty((nvert, nrad, self.ndust))
+                rhod = np.empty((nvert, nrad, self.ndust))
                 for ia in range(len(acm)):
                     sigd_a[:,:,ia] = sigd * weights[ia]
                     zd[:,:,ia] = zdust_min + (zdust_max - zdust_min) / \
                                  (1 + np.exp(2.*(lacm[ia] - lmid_acm)))
                     rhod[:,:,ia] = np.exp(-0.5 * (z / zd[:,:,ia])**2) * \
-                                   sigd_a[:,:,ia] / \ 
-                                   (np.sqrt(2 * np.pi) * zd[:,:,ia])
-
-                sys.exit()
-
+                                   sigd_a[:,:,ia] / (np.sqrt(2 * np.pi) * \
+                                                     zd[:,:,ia])
 
         return rhod
 

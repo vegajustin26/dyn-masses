@@ -14,7 +14,7 @@ model_name = 'demo_rt_multisize'
 
 print('making structure')
 t0 = time.time()
-di = sim_disk(model_name)
+di = sim_disk(model_name, cyl=True, writestruct=False)
 print(time.time()-t0)
 
 sys.exit()

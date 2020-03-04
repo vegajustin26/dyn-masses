@@ -65,6 +65,24 @@ class sim_grid:
                 self.write_starspec()
 
 
+        # note number of dust species
+        if self.setup["incl_dust"]:
+            if self.diskpars["dust"]["type"] == 'composite':
+                self.ndust = 1
+
+            if self.diskpars["dust"]["type"] == 'multi':
+                # load index to size correspondance
+                dind, dsize = np.loadtxt('opacs/' + self.setup["dustspec"] + \
+                                         '_sizeindex.txt').T
+
+                # find index for maximum dust size
+                amax = self.diskpars["dust"]["arguments"]["amax"]
+                dindmax = np.max(dind[dsize <= amax])
+
+                # queue up dust species
+                self.ndust = np.int(dindmax + 1)
+
+
 
     def _read_spatial_grid(self, args, refine=False, cyl=False):
         if cyl:
