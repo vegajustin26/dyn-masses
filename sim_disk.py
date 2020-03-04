@@ -502,30 +502,48 @@ class sim_disk:
                 acm = dsize[:self.ndust]
                 lacm = np.log10(acm)
 
-                # a logistic distribution
+                # a logistic distribution for the size-dependent dust heights
                 zdust_min = args.pop("hdust", 0.01) * r * \
                             (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
                 zdust_max = args.pop("hmax", 0.1) * r * \
                             (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
-                testzd = 0.01 + (0.1 - 0.01) / \
-                         (1 + np.exp(2.*(lacm-0.5*(lacm[0]+lacm[-1]))))
-                plt.semilogx(acm, testzd, 'o')
-                plt.axis([1e-5, 1e-1, 0.01, 0.1])
-                plt.show() 
-                cols = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 
-                        'C9', 'C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 
-                        'C7', 'C8', 'C9', 'C0']
                 lmid_acm = 0.5*(lacm[0]+lacm[-1])
+
+                # normalize the size-dependent surface densities
+                # parameters
+                rho_s = args.pop("rho_s", 1.675)
+                pdust = args.pop("pdust", 3.5)
+
+                # masses and mass bin gradients
+                mgrain = 4 * np.pi * rho_s * acm**3 / 3
+                mgrainw = np.zeros(self.ndust + 1)
+                mgrainw[1:-1] = np.sqrt(mgrain[1:] * mgrain[:-1])
+                mgrainw[0] = mgrain[0]
+                mgrainw[-1] = mgrain[-1]
+                dmgrain = mgrainw[1:] - mgrainw[:-1]
+
+                # size distribution weights
+                massdist = mgrain**((-pdust - 2) / 3)
+                dummy = (massdist * mgrain * dmgrain).sum()
+                massdist = massdist / dummy
+                weights = massdist * mgrain * dmgrain
+
+                # surface densities
+                sigd = self.sigma_dust(r, **args)
+
+                # compute normalized density distributions
+                sigd_a = np.empty((self.nt, self.nr, self.ndust))
                 zd = np.empty((self.nt, self.nr, self.ndust))
+                rhod = np.empty((self.nt, self.nr, self.ndust))
                 for ia in range(len(acm)):
+                    sigd_a[:,:,ia] = sigd * weights[ia]
                     zd[:,:,ia] = zdust_min + (zdust_max - zdust_min) / \
                                  (1 + np.exp(2.*(lacm[ia] - lmid_acm)))
-                    plt.plot(r / self.AU, zd[:,:,ia] / self.AU, cols[ia])
-                plt.plot(r / self.AU, zdust_min / self.AU, ':k')
-                plt.plot(r / self.AU, zdust_max / self.AU, ':k')
-                plt.show()
+                    rhod[:,:,ia] = np.exp(-0.5 * (z / zd[:,:,ia])**2) * \
+                                   sigd_a[:,:,ia] / \ 
+                                   (np.sqrt(2 * np.pi) * zd[:,:,ia])
+
                 sys.exit()
-                z_max = self.zdust(r=r, **args)     
 
 
         return rhod
