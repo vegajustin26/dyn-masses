@@ -83,15 +83,14 @@ class sim_disk:
             self.rhodust = self.density_dust(**self.rhod_args)
             if writestruct:
                 np.savetxt(modelname+'/dust_density.inp',
-                           np.ravel(self.rhodust),
-                           fmt='%.6e', header=hdr+'\n1', comments='')
+                           np.ravel(self.rhodust), fmt='%.6e', 
+                           header=hdr+'\n'+str(self.ndust), comments='')
                 # generate supplementary radial profiles
                 z_dust = self.zdust(r=self.rvals, **self.rhod_args)
                 prof = list(zip(self.rvals / self.AU, self.sigd, 
                                 z_dust / self.AU))
                 np.savetxt(modelname+'/dust_profiles.txt', prof, fmt='%.6e',
                            header='rau, sigma_d, hdust')
-
 
         # compute temperature structure (presumes Tgas = Tdust)
         self.T_args = self.diskpars["temperature"]["arguments"]
@@ -184,7 +183,10 @@ class sim_disk:
             os.chdir(self.modelname)
             os.system('radmc3d mctherm setthreads 4')
             tdust = np.loadtxt('dust_temperature.dat', skiprows=3)
-            tdust = np.reshape(tdust, (self.nt, self.nr))
+            if self.diskpars["dust"]["type"] == 'multi':
+                tdust = np.reshape(tdust, (self.ndust, self.nt, self.nr))
+            elif self.diskpars["dust"]["type"] == 'composite':
+                tdust = np.reshape(tdust, (self.nt, self.nr))
             os.chdir('../')
             return tdust
 
@@ -504,9 +506,9 @@ class sim_disk:
 
                 # a logistic distribution for the size-dependent dust heights
                 zdust_min = args.pop("hdust", 0.01) * r * \
-                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
+                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.25)
                 zdust_max = args.pop("hmax", 0.1) * r * \
-                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.0)
+                            (r / (args["Rc"] * self.AU))**args.pop("psi", 0.25)
                 lmid_acm = 0.5*(lacm[0]+lacm[-1])
 
                 # normalize the size-dependent surface densities
@@ -536,17 +538,17 @@ class sim_disk:
 
                 # compute normalized density distributions
                 nrad, nvert = np.shape(r)[1], np.shape(r)[0]
-                sigd_a = np.empty((nvert, nrad, self.ndust))
-                zd = np.empty((nvert, nrad, self.ndust))
-                rhod = np.empty((nvert, nrad, self.ndust))
+                sigd_a = np.empty((self.ndust, nvert, nrad))
+                zd = np.empty((self.ndust, nvert, nrad))
+                rhod = np.empty((self.ndust, nvert, nrad))
                 for ia in range(len(acm)):
-                    sigd_a[:,:,ia] = sigd * weights[ia]
-                    zd[:,:,ia] = zdust_min + (zdust_max - zdust_min) / \
+                    sigd_a[ia,:,:] = sigd * weights[ia]
+                    zd[ia,:,:] = zdust_min + (zdust_max - zdust_min) / \
                                  (1 + np.exp(2.*(lacm[ia] - lmid_acm)))
-                    rhod[:,:,ia] = np.exp(-0.5 * (z / zd[:,:,ia])**2) * \
-                                   sigd_a[:,:,ia] / (np.sqrt(2 * np.pi) * \
-                                                     zd[:,:,ia])
-
+                    rhod[ia,:,:] = np.exp(-0.5 * (z / zd[ia,:,:])**2) * \
+                                   sigd_a[ia,:,:] / (np.sqrt(2 * np.pi) * \
+                                                     zd[ia,:,:])
+                    
         return rhod
 
 

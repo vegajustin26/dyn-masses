@@ -12,25 +12,27 @@ from raytrace_maps import raytrace_maps
 
 model_name = 'demo_rt_multisize'
 
+#os.system('rm -rf '+model_name)
+
 print('making structure')
 t0 = time.time()
-di = sim_disk(model_name, cyl=True, writestruct=False)
+di = sim_disk(model_name)
 print(time.time()-t0)
 
-sys.exit()
+#sys.exit()
 
 #T = di.temperature(r=1.496e15, z=np.array([0., 1.496e14]), **sim_disk.T_args)
 
 
 #print(di.scaleheight(r=1.496e15, T=T) / 1.496e15)
 
-#print('plotting structures')
-#_ = plotutils(model_name)	#, struct=di)
+print('plotting structures')
+_ = plotutils(model_name)	#, struct=di)
 
-os.chdir(model_name)
-os.system('radmc3d sed ' + \
-          'incl %.2f ' % 60 + \
-          'setthreads 4')
+#os.chdir(model_name)
+#os.system('radmc3d sed ' + \
+#          'incl %.2f ' % 60 + \
+#          'setthreads 4')
 
 
 sys.exit()

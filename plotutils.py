@@ -37,14 +37,45 @@ class plotutils:
             self.Rgrid = 0.5*(Rw[:-1] + Rw[1:])
             self.Tgrid = 0.5*(Tw[:-1] + Tw[1:])
 
-            # temperatures
-            if self.setup["incl_dust"]: 
+            if self.setup["incl_dust"]:
+                # dust densities
+                ndust = int(np.loadtxt(mname+'/dust_density.inp',
+                            skiprows=2, max_rows=1))
+                rhod_in = np.loadtxt(mname+'/dust_density.inp', skiprows=3)
+                if (ndust > 1):
+                    rhod_a = np.reshape(rhod_in, (ndust, nt, nr))
+                    self.rhod = np.sum(rhod_a, axis=0)
+                    #dind, all_acm = np.loadtxt('opacs/dsharp_sizeindex.txt').T
+                    #acm = all_acm[:ndust]
+                    #self.rhod = np.trapz(rhod_a, acm, axis=0)
+                else: self.rhod = np.reshape(rhod_in, (nt, nr))
+
+                _ = self.plot_dustdens()
+                _.savefig(mname+'/dustdens.png')
+
+                # radial profiles
+                self.dr, self.dsig, self.dH = np.loadtxt(mname + \
+                                                         '/dust_profiles.txt', \
+                                                         skiprows=1).T
+                _ = self.plot_sigd()
+                _.savefig(mname+'/sigma_d.png')
+                _ = self.plot_Hdust()
+                _.savefig(mname+'/Hdust.png')
+
+                # temperatures
                 T_in = np.loadtxt(mname+'/dust_temperature.dat', skiprows=3)
+                if (ndust > 1):
+                    temp_a = np.reshape(T_in, (ndust, nt, nr))
+                    self.temp = np.sum(temp_a * rhod_a, axis=0) / \
+                                np.sum(rhod_a, axis=0)
+                else: self.temp = np.reshape(T_in, (nr, nr))
+
             else:
                 T_in = np.loadtxt(mname+'/gas_temperature.inp', skiprows=2)
-            self.temp = np.reshape(T_in, (nt, nr))
+                
             _ = self.plot_temp()
             _.savefig(mname+'/temp.png')
+
 
             if self.setup["incl_lines"]:
                 # gas densities
@@ -81,23 +112,6 @@ class plotutils:
                 _.savefig(mname+'/sigma_g.png')
                 _ = self.plot_Hp()
                 _.savefig(mname+'/Hp.png')
-
-
-            if self.setup["incl_dust"]:
-                # dust densities
-                rhod_in = np.loadtxt(mname+'/dust_density.inp', skiprows=3)
-                self.rhod = np.reshape(rhod_in, (nt, nr))
-                _ = self.plot_dustdens()
-                _.savefig(mname+'/dustdens.png')
-
-                # radial profiles
-                self.dr, self.dsig, self.dH = np.loadtxt(mname + \
-                                                         '/dust_profiles.txt', \
-                                                         skiprows=1).T
-                _ = self.plot_sigd()
-                _.savefig(mname+'/sigma_d.png')
-                _ = self.plot_Hdust()
-                _.savefig(mname+'/Hdust.png')
 
 
             if (self.setup["incl_lines"] and self.setup["incl_dust"]):

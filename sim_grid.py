@@ -305,11 +305,11 @@ class sim_grid:
                 f.write(str(self.ndust)+'\n')
                 f.write(dbarr+'\n')
                 for ix in range(self.ndust):
-                    f.write('10\n0\n')
+                    f.write('1\n0\n')
                     f.write('%s\n' % (self.setup["dustspec"] + '_' + idust[ix]))
                     f.write(sbarr)
                     if (ix < self.ndust-1): f.write('\n')
-                    os.system('cp opacs/dustkapscatmat_' + \
+                    os.system('cp opacs/dustkappa_' + \
                               self.setup["dustspec"] + '_' + idust[ix] + \
                               '.inp ' + self.modelname + '/')
                 f.close()
