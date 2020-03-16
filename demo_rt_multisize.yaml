@@ -1,0 +1,114 @@
+grid:
+    spatial:
+        nr: 512
+        nt: 256
+        r_min: 0.5
+        r_max: 500
+
+    cyl:
+        nr: 1024
+        nz: 2048
+        r_min: 0.1
+        r_max: 500
+        z_min: 0.001
+        z_max: 500
+        
+setup:
+    incl_dust: 1
+    incl_lines: 0
+    nphot: 500000000
+    scattering: 'Isotropic'
+    camera_tracemode: 'image'
+    molecule: 'co'
+    transition: 2
+    dustspec: 'dsharp'
+
+host_params: 
+    T_eff: 9332.
+    L_star: 17.0
+    M_star: 2.04
+
+disk_params:
+    substructure:
+        type: 'None'        # options = {None, gaps_gauss, gaps_sqr}
+        arguments:
+            locs: []
+            wids: []            # half-widths (or std devs)
+            deps: []
+
+    dust:
+        type: 'multi'       # options = {multi, composite}
+        arguments:
+            amax: 0.1               # in cm
+            pdust: 3.5              
+            rho_s: 1.675
+        
+    gas_density:
+        type: 'self_similar'    # options = {self_similar, powerlaw}
+        arguments:
+            Rc: 150.
+            sig0: 30.
+            p1: 0.75
+            p2: 1.50
+
+    dust_density:
+        type: 'powerlaw'        # options = {self_similar, powerlaw}
+        arguments:
+            Rc: 150.
+            sig0: 1.3
+            p1: 0.5
+            p2: 10.
+            hdust: 0.01
+
+    temperature:        
+        type: 'rt'         # options = {dartois, isoz, rt}
+        arguments:
+            r0_T: 30.
+            T0mid: 30.
+            qmid: -0.5
+            T0atm: 60.
+            qatm: -0.5
+            delta: 1.0
+            ZqHp: 4.0
+        
+    abundance:
+        type: 'chemical'        # options = {chemical, layer}
+        arguments:
+            xmol: 0.0001
+            depletion: 0.00000001
+            logNpd: 20.699
+            tfreeze: 19.
+            zrmax: 0.45
+            zrmin: 0.005
+            rmin: 1.0
+            rmax: 300.0
+
+    rotation:
+        type: 'keplerian'       # options = {keplerian}
+        arguments:
+            height: 1
+            pressure: 1
+            selfgravity: 0
+
+    turbulence:
+        type: 'isotropic'       # options = {isotropic}
+        arguments:
+            xi: 0.01
+
+
+outputs:
+    geometry:
+        dpc: 101                # distance in pc
+        PA: 90.0                # PA: of blueshifted major axis (!)
+        incl: 120.              # incl: along major axis, "top" is near side if
+                                # incl < 90, "bottom" if incl > 90 
+
+    spatial:
+        ires: 0.010
+        RA: 165.5
+        DEC: -34.7
+
+    velocity:
+        widthkms: 3.0
+        dfreq: 122              # final frequency resolution, in kHz
+        oversample: 1
