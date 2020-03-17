@@ -1,0 +1,40 @@
+# target		dyn mass?	pub data?	Mdyn poss?	ALMA archive?	Mdyn poss?	contam?		Av?	logL	Fmm
+IRAS_04108+2910		...		...		no		no		no		?
+FM_Tau			0.36+/0.02	Simon17		yes		-		-		...		
+V410_X-ray_2		...		...		no		no		no		?
+IRAS_04187+1927		...		...		no		yes		unlikely	?
+FT_Tau			...		...		no		yes		unlikely	?
+IRAS_04216+2603		...		...		no		no		no		?
+IP_Tau			0.94+/-0.05	Simon17		yes		-		-		...
+IQ_Tau			0.74+/-0.02	Guilloteau14	yes		-		-		...
+JH_56			...		...		no		no		no		?
+Haro_6-13		0.93+/-0.14	Guilloteau14	yes		-		-		...
+FZ_Tau			...		...		no		yes		possible	?
+IRAS_04301+2608		...		...		no		no		no		?
+IRAS_04303+2240		...		...		no		yes		no		?
+HO_Tau			0.43+/-0.03	Simon17		yes		-		-		...
+DN_Tau			0.87+/-0.15	Guilloteau14	yes		-		-		...
+DO_Tau			...		...		no		yes		likely		wind/outflow
+IRAS_04370+2559		...		...		no		no		no		?
+IRAS_04385+2550		...		...		no		yes*		likely		envelope?
+***********************************************************************************************************************************************
+EX_Lup			possible	Hales19		yes		-		-		...
+Sz_91			possible	Tsukagoshi	yes		-		-		...
+Sz_106			...		...		no		
+Sz_111 			...     	Ansdell16,18	yes		-		-		...
+J16124373		...		...		no
+UZ_Cha
+VY_Cha
+VZ_Cha
+Hn_11
+CW_Cha
+Sz_45
+J16233283
+ISO-Oph_43
+ISO-Oph_51
+WL_1
+ISO-Oph_116
+WL_3
+ISO-Oph_152
+ISO-Oph_154
+WSB_52

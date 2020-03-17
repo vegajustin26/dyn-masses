@@ -1,0 +1,34 @@
+# target                dyn mass?       pub data?       Mdyn poss?      ALMA archive?   Mdyn possible?	contam?         Av?     logL    Fmm
+J04202606		...		...		no		no		no		?
+J04231822		...		...		no		no		no		?
+XEST_13-010		...		...		no		no		no		?
+LkHa_267		...		...		no		yes+(in FOV)	possible	more sources
+ITG_33A			...		...		no		yes		unlikely	?
+ITG_40			...		...		no		yes		unlikely	?
+XEST_26-071		...		...		no		yes		unlikely	?
+CIDA_8			...		...		no		no		no		?
+
+Sz_131			
+Sz_95
+J16085324
+Sz_117
+Sz_13
+ISO-ChaI_91
+HN_Cha
+Hn_10e
+WZ_Cha
+XX_Cha
+Allers_8
+WSB_14
+J16243520
+J16250692
+ISO-Oph_26
+WL_7
+ISO-Oph_93
+ISO-Oph_106
+ISO-Oph_117
+ISO-Oph_119
+ISO-Oph_146
+ISO-Oph_177
+J16280256
+J16282151
