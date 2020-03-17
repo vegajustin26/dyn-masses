@@ -1,0 +1,16 @@
+Dartmouth: at 2 Myr
+Tmid = np.sqrt(0.02 * Lstar / 8 * pi * r**2 * sigma_sb)
+Rc set to Rmm(0.9mm) at 90%; that's meant to mimic Rco = 2.5 Rmm, accounting 
+for high optical depths and exponential tail (uses ARA&A plot).
+Rc = 120 * (Mstar / Msun)**0.9 au
+Mdisk uses mean relation in ARA&A and standard assumptions:
+Mdisk = 0.02 * (Mstar / Msun)**1.7 Msun
+assuming similarity solution with gamma = 1, so sig0 = Mdisk / 2 pi Rc**2
+
+model    Mstar	lgLstar	  Tmid0	  Rc	Mdisk	sig0
+A	 0.3	-0.7814	  25.1	  40    0.003   2.65
+B	 0.6	-0.3213   32.7    75    0.008   2.01
+C	 0.9	-0.0224   38.9    110   0.017   1.99
+D	 1.2	 0.1981   44.1    140   0.027   1.95
+E	 1.5	 0.3818   49.0    170   0.040   1.96
+F	 2.0	 0.6530   57.3    225   0.065   1.82
