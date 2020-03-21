@@ -10,8 +10,8 @@ from post_summary import post_summary
 
 
 # inputs
-#inp_dat = ascii.read('Tau_done.txt')
-inp_dat = ascii.read('Tau_targets.txt')
+inp_dat = ascii.read('Tau_done.txt')
+#inp_dat = ascii.read('Tau_targets.txt')
 in_logT = np.log10(inp_dat['Teff'])
 in_elogT = 0.4343*inp_dat['eTeff']/inp_dat['Teff']
 in_logL = inp_dat['L']
@@ -19,10 +19,10 @@ in_elogL = 0.15 * np.ones_like(in_logL)
 sname = inp_dat['name']
  
 #fspot = ['f000', 'f017', 'f034', 'f051', 'f068', 'f085']
-fspot = ['f000']
+fspot = ['f085']
 
 for i in range(len(fspot)):
-    for j in np.arange(9, len(sname), 1):	#range(len(sname)):
+    for j in [13]:	#np.arange(14, len(sname), 1):	#range(len(sname)):
 
         # bookkeeping
         print(sname[j])
