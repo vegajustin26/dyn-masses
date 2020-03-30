@@ -22,7 +22,7 @@ class sim_grid:
 
         # load grid parameters 
         self.modelname = modelname
-        conf = open(modelname+'.yaml')
+        conf = open(self.modelname+'.yaml')
         config = yaml.load(conf, Loader=yaml.FullLoader)
         self.gridpars = config["grid"]
         self.diskpars = config["disk_params"]

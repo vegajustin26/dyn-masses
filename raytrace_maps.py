@@ -26,22 +26,17 @@ class raytrace_maps:
         npix = np.int(np.ceil(npix / 2) * 2)
 
 
-        # velocity scale
-        cc = 2.99792458e10
-        nu0 = 230.538e9
+        # velocity scale (force width to give integer # of channels with the 
+        # prescribed velocity resolution)
+        widthkms_0 = outpars["velocity"]["widthkms"]
+        velres = outpars["velocity"]["velres"]
+        extra_width = (2 * widthkms_0 / velres) % 1
+        nchan = np.int(2 * widthkms_0 / velres - extra_width)
+        print(widthkms_0, nchan, 2 * widthkms_0 / nchan)
+        widthkms = velres * nchan / 2.
+        print(widthkms, 2 * widthkms / velres, nchan)
 
-        DV0 = 2 * 1e5 * outpars["velocity"]["widthkms"]
-        dnu = 1e3 * outpars["velocity"]["dfreq"]	
-        nchan = outpars["velocity"]["oversample"] * \
-                np.int(np.ceil(DV0 * nu0 / cc / dnu))
-        widthkms = (nchan - 1) * cc * dnu / nu0 / 1e5 / 2 / \
-                   outpars["velocity"]["oversample"]
-        widthkms = 15.0
-        nchan = 300
-        widthkms = 0.15
-        nchan = 3
-        print(widthkms, nchan)
-
+        sys.exit()
 
         # run raytracer
         os.chdir(modelname)
@@ -53,7 +48,7 @@ class raytrace_maps:
                   'iline %d ' % setpars["transition"] + \
                   'widthkms %.5f ' % widthkms + \
                   'linenlam %d ' % nchan + \
-                  'setthreads 4')
+                  'setthreads 5')
 
 
         # make a FITS cube
@@ -62,7 +57,7 @@ class raytrace_maps:
             os.system('rm ' + outfile)
             convert_to_fits('image.out', outfile, outpars["geometry"]["dpc"], 
                             RA=outpars["spatial"]["RA"], 
-                            DEC=outpars["spatial"]["DEC"], 
-                            downsample=outpars["velocity"]["oversample"])
+                            DEC=outpars["spatial"]["DEC"]) 
+                            #downsample=outpars["velocity"]["oversample"])
 
         os.chdir('../')

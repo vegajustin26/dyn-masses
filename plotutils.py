@@ -68,10 +68,11 @@ class plotutils:
                     temp_a = np.reshape(T_in, (ndust, nt, nr))
                     self.temp = np.sum(temp_a * rhod_a, axis=0) / \
                                 np.sum(rhod_a, axis=0)
-                else: self.temp = np.reshape(T_in, (nr, nr))
+                else: self.temp = np.reshape(T_in, (nt, nr))
 
             else:
                 T_in = np.loadtxt(mname+'/gas_temperature.inp', skiprows=2)
+                self.temp = np.reshape(T_in, (nt, nr))
                 
             _ = self.plot_temp()
             _.savefig(mname+'/temp.png')

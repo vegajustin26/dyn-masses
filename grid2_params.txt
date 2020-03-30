@@ -1,0 +1,55 @@
+Stellar parameters:
+-------------------
+used Dartmouth (non-magnetic) model parameters at 2 Myr
+
+
+Temperatures:
+-------------
+Simple Chiang & Goldreich type of model for midplane:
+
+Tmid = (0.02 * Lstar / 8 * pi * r**2 * sigma_sb)**0.25
+
+Set surface temperatures to be Tatm = 2.5 * Tmid, somewhat arbitrarily.
+
+I then used the Dullemond et al. 2020 (Appendix D) vertical temperature 
+prescription to connect the midplane and surface smoothly, with hs = 0.2 and 
+ws = 0.05 (dimensionless aspect ratio parameters).
+
+All temperatures are clipped at 5 K (and 800 K).
+
+
+Sizes and Density profiles:
+---------------------------
+There's some anecdotal evidence (from Dullemond, Teague, and others) that the 
+outer edges of the gas disks are fairly sharp, so the "end" of the 12CO really 
+does appear to be something like 95% of the gas.  Dullemond et al. 2020 found 
+this clearly in the HD 163296 disk kinematics, which go strong sub-Keplerian.  
+Rich sees this too in TW Hya.  
+
+So, let's assume that's right and adopt a modified similarity solution to 
+accomodate it naturally, with gamma1 = 1.0 and gamma2 = 2.0.  For the 
+characteristic radius, we rely on measurements of the mm - CO size scaling:
+
+Rc set to Rmm(0.9mm) at 90%; meant to mimic Rco = 2.5 Rmm, accounting for high 
+optical depths and exponential tail (uses ARA&A plot).  So,
+
+Rc = 120 * (Mstar / Msun)**0.9 au.
+
+To make sure that chemical effects do not introduce issues, we will use the 
+'layered' abundance model, with Rout = 3 * Rc.  (See below on vertical layers.)
+
+To normalize the density profile, I will assume an Mdisk that uses the mean 
+relation in ARA&A and standard assumptions:
+
+Mdisk = 0.02 * (Mstar / Msun)**1.7 Msun.
+
+For this similarity solution form, this gives density profile normalizations 
+(sig0) such that: 
+
+model    Mstar	lgLstar	  Tmid0	  Rc	Mdisk	sig0
+A	 0.3	-0.7814	  25.1	  40    0.003   3.00
+B	 0.6	-0.3213   32.7    75    0.008   2.27
+C	 0.9	-0.0224   38.9    110   0.017   2.24
+D	 1.2	 0.1981   44.1    140   0.027   2.20
+E	 1.5	 0.3818   49.0    170   0.040   2.21
+F	 2.0	 0.6530   57.3    225   0.065   2.05

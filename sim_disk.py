@@ -25,7 +25,7 @@ class sim_disk:
     min_dens = 1e0  # minimum gas density in [H2/cm**3]
     max_dens = 1e20 # maximum gas density in [H2/cm**3]
     min_temp = 5e0  # minimum temperature in [K]
-    max_temp = 5e2  # maximum temperature in [K]
+    max_temp = 8e2  # maximum temperature in [K]
 
 
     def __init__(self, modelname, grid=None, writestruct=True, cyl=False):
@@ -97,6 +97,7 @@ class sim_disk:
         self.temp = self.temperature(**self.T_args)
         if writestruct:
             if self.setup["incl_lines"]:
+                self.temp = np.clip(self.temp, self.min_temp, self.max_temp)
                 np.savetxt(modelname+'/gas_temperature.inp', 
                            np.ravel(self.temp), fmt='%.6e', header=hdr, 
                            comments='')
@@ -167,6 +168,24 @@ class sim_disk:
             T = np.cos(np.pi * z / 2.0 / zatm)**(2 * delta)
             T = np.where(abs(z) < zatm, (Tmid - Tatm) * T, 0.0)
             return T + Tatm
+
+        # Dullemond et al. 2020 (Appendix D)
+        if (self.diskpars["temperature"]["type"] == 'dullemond'):
+            try:
+                r0 = args["r0_T"] * self.AU
+                T0mid, qmid = args["T0mid"], args["qmid"]
+                T0atm, qatm = args.pop("T0atm", T0mid), args.pop("qatm", qmid)
+            except KeyError:
+                raise ValueError("Specify at least `r0_T`, `T0mid`, `qmid`.")
+            r = self.rcyl if r is None else r
+            z = self.zcyl if z is None else z
+            Tmid = self.powerlaw(r, T0mid, qmid, r0)
+            Tatm = self.powerlaw(r, T0atm, qatm, r0)
+            aspect_mid = self.scaleheight(r=r, T=Tmid) / r
+            hs_p = aspect_mid * args.pop("hs", 2.0)
+            ws_p = aspect_mid * args.pop("ws", 0.5)
+            fz = 0.5 * np.tanh(((z / r) - hs_p) / ws_p) + 0.5
+            return (Tmid**4 + fz * Tatm**4)**0.25
 
         # vertically isothermal
         if (self.diskpars["temperature"]["type"] == 'isoz'):
