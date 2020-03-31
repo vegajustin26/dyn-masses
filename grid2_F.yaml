@@ -95,10 +95,10 @@ outputs:
 
     spatial:
         ires: 0.020
-        RA: 268.336
-        DEC: -21.956
+        RA: 65.0
+        DEC: 23.0
 
     velocity:
-        widthkms: 3.0              # full line halfwidth (+/- this number)
+        widthkms: 6.0              # full line halfwidth (+/- this number)
         velres: 0.092              # final velocity resolution in km/s
         oversample: 1

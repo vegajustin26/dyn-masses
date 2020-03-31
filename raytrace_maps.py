@@ -25,30 +25,26 @@ class raytrace_maps:
         npix = sizeau / outpars["geometry"]["dpc"] / outpars["spatial"]["ires"]
         npix = np.int(np.ceil(npix / 2) * 2)
 
-
         # velocity scale (force width to give integer # of channels with the 
         # prescribed velocity resolution)
         widthkms_0 = outpars["velocity"]["widthkms"]
         velres = outpars["velocity"]["velres"]
         extra_width = (2 * widthkms_0 / velres) % 1
         nchan = np.int(2 * widthkms_0 / velres - extra_width)
-        print(widthkms_0, nchan, 2 * widthkms_0 / nchan)
         widthkms = velres * nchan / 2.
-        print(widthkms, 2 * widthkms / velres, nchan)
 
-        sys.exit()
 
         # run raytracer
         os.chdir(modelname)
-        os.system('radmc3d image ' + \
-                  'incl %.2f ' % outpars["geometry"]["incl"] + \
-                  'posang %.2f ' % posang + \
-                  'npix %d ' % npix + \
-                  'sizeau %d ' % sizeau + \
-                  'iline %d ' % setpars["transition"] + \
-                  'widthkms %.5f ' % widthkms + \
-                  'linenlam %d ' % nchan + \
-                  'setthreads 5')
+        #os.system('radmc3d image ' + \
+        #          'incl %.2f ' % outpars["geometry"]["incl"] + \
+        #          'posang %.2f ' % posang + \
+        #          'npix %d ' % npix + \
+        #          'sizeau %d ' % sizeau + \
+        #          'iline %d ' % setpars["transition"] + \
+        #          'widthkms %.5f ' % widthkms + \
+        #          'linenlam %d ' % nchan + \
+        #          'setthreads 5')
 
 
         # make a FITS cube
