@@ -36,15 +36,15 @@ class raytrace_maps:
 
         # run raytracer
         os.chdir(modelname)
-        #os.system('radmc3d image ' + \
-        #          'incl %.2f ' % outpars["geometry"]["incl"] + \
-        #          'posang %.2f ' % posang + \
-        #          'npix %d ' % npix + \
-        #          'sizeau %d ' % sizeau + \
-        #          'iline %d ' % setpars["transition"] + \
-        #          'widthkms %.5f ' % widthkms + \
-        #          'linenlam %d ' % nchan + \
-        #          'setthreads 5')
+        os.system('radmc3d image ' + \
+                  'incl %.2f ' % outpars["geometry"]["incl"] + \
+                  'posang %.2f ' % posang + \
+                  'npix %d ' % npix + \
+                  'sizeau %d ' % sizeau + \
+                  'iline %d ' % setpars["transition"] + \
+                  'widthkms %.5f ' % widthkms + \
+                  'linenlam %d ' % nchan + \
+                  'setthreads 5')
 
 
         # make a FITS cube

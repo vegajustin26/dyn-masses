@@ -99,6 +99,6 @@ outputs:
         DEC: 23.0
 
     velocity:
-        widthkms: 6.0              # full line halfwidth (+/- this number)
+        widthkms: 6.2              # full line halfwidth (+/- this number)
         velres: 0.092              # final velocity resolution in km/s
         oversample: 1
