@@ -47,7 +47,9 @@ For this similarity solution form, this gives density profile normalizations
 (sig0) such that: 
 
 model    Mstar	lgLstar	  Tmid0	  Rc	Mdisk	sig0
+Alo      0.2    -1.00     22.2    28    0.001   3.30
 A	 0.3	-0.7814	  25.1	  40    0.003   3.00
+C8	 0.45   -0.41     31.1    60	0.005	2.25
 B	 0.6	-0.3213   32.7    75    0.008   2.27
 C	 0.9	-0.0224   38.9    110   0.017   2.24
 D	 1.2	 0.1981   44.1    140   0.027   2.20
