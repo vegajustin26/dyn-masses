@@ -1,0 +1,6 @@
+J04202144        M1     100.    n/a     n/a     n/a     edge-on
+IRAS_04301+2608  M0     100.    n/a     n/a     n/a     edge-on
+HV_Tau_C         K6     100.    n/a     n/a     n/a     done (edge-on)
+ITG_33A          M3     100.    n/a     n/a     n/a     edge-on
+HK_Tau_B         M2     100.    n/a     n/a     n/a     done (edge-on)
+IRAS_04370+2559  C      n/a     n/a     n/a     n/a     no stellar data

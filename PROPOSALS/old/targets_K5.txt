@@ -1,0 +1,25 @@
+# target                dyn mass?       pub data?       Mdyn poss?      ALMA archive?   Mdyn poss?	contam?         Av?     logL    Fmm
+DG_Tau			...		...		no(?)		yes, many	yes		wind/outflow	
+IRAS_04260+2642		...		...		no		2019.1.00847*	hopeful		envelope?
+FY_Tau			...		...		no		...		no		?
+LkCa_15			1.14+/-0.03	Guilloteau14	yes		-		-		
+DR_Tau			...		...		no(?)		yes, several	hopeful		wind/outflow
+DS_Tau			0.83+/-0.02	Simon17		yes		-		-		?
+
+Sz_133	
+J16080175
+V1094_Sco
+UX_Cha
+ISO-ChaI_237
+GSS_29
+DoAr_25
+GSS_32
+Elias_24
+WL_10
+YLW_18
+YLW_47
+DoAr_32
+ISO-Oph_195
+SR_20W
+WaOph_6
+AS_209

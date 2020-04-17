@@ -1,0 +1,13 @@
+J15450887        M5.5   -1.21  0.11  3062       archive; good (+Yen)
+HW_Lup           M4.5   -1.03  0.10  3199       archive; good
+GW_Lup           M1.5   -0.48  0.10  3631       archive; good
+IM_Lup           K5     0.41   0.10  4365       archive; good
+RU_Lup           K7     0.18   0.10  4074       archive; good
+Sz_129           K7     -0.38  0.09  4074       archive; good
+MY_Lup           K0     0.60   0.09  5105       archive; good
+Sz_91            M1     -0.71  0.10  3724       archive; good
+Sz_111           M1     -0.68  0.10  3715       archive; good
+RX_J1615.3-3255  K5     -0.04  0.20  4365       archive; good
+Sz_114           M4.75  -0.69  0.10  3177       archive; OK (contamin.)
+HK_Lup           K7     1.00   0.17   0.09  4074        archive; OK
+J16083070        K2     0.20   0.27   0.10  4898        archive; OK

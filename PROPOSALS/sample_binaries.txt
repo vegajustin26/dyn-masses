@@ -1,0 +1,65 @@
+FO_Tau_A         M3.5 	0.15
+FO_Tau_B         M3.5 	0.15
+DD_Tau_A         M3.5   0.57
+DD_Tau_B         M3.5   0.57
+FQ_Tau_A         M3     0.78
+FQ_Tau_B         M3.5   0.78
+FS_Tau_A         M0     0.23
+FV_Tau_A         K5     0.72
+FV_Tau_B         K6     0.72
+FV_Tau_c_A       M2.5   0.74
+FV_Tau_c_B       M3.5   0.74
+J04284263_A      M5.25  0.63
+
+DH_Tau_A         M1     2.34
+
+FX_Tau_A         M1     0.89
+
+DK_Tau_A         K8     2.36
+DK_Tau_B         M1     2.36
+
+XZ_Tau_A         M2     0.3
+XZ_Tau_B         M3.5   0.3
+
+HK_Tau_A         M0.5   2.35
+HK_Tau_B         M2     2.35
+
+V710_Tau_A       M0.5   3.17
+
+UZ_Tau_Wa        M2     0.37
+UZ_Tau_Wb        M3     0.37
+JH_112_Aa        K5.5   1.65
+JH_112_Ab        M4.5   1.65
+GH_Tau_A         M2     0.31
+GH_Tau_B         M2     0.31
+IS_Tau_A         M0     0.22
+IS_Tau_B         M3.5   0.22
+
+HN_Tau_A         K5     3.14
+HN_Tau_B         M4     3.14
+
+IT_Tau_A         K3     2.41
+IT_Tau_B         M4     2.41
+
+CoKu_Tau_3_A     M0.5   2.10
+CoKu_Tau_3_B     M4.25  2.10
+
+Haro_6-28_A      M2     0.65
+Haro_6-28_B      M3.5   0.65
+VY_Tau_A         M1.5   0.66
+GN_Tau_A         M2.5   0.34
+GN_Tau_B         M2.5   0.34
+
+JH_223_A         M2     2.10
+
+V955_Tau_A       K7     0.32
+V955_Tau_B       M2.5   0.32
+DP_Tau_A         M0.5   0.11
+DP_Tau_B         M2     0.11
+UY_Aur_A         M0     0.88
+UY_Aur_B         M2.5   0.88
+
+CIDA_9_A         K8     2.30
+
+RW_Aur_A         K2.5   1.42
+RW_Aur_B         K5     1.42

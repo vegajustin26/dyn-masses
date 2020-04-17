@@ -1,0 +1,27 @@
+# target                dyn mass?       pub data?       Mdyn poss?      ALMA archive?   Mdyn poss?	contam?         Av?     logL    Fmm
+BP_Tau			1.10+/-0.04	Simon09		yes		-		-		...
+V819_Tau		...		...		no		yes		no		?
+GI_Tau			...		...		no(?)		yes		unlikely	?
+GK_Tau			0.73+/-0.06	Simon17		yes		-		-		...
+DL_Tau			1.04+/-0.02	Simon17		yes		-		-		...
+CI_Tau			0.90+/-0.02	Simon17		yes		-		-		...
+AA_Tau			0.84+/-0.02	Simon19		yes		-		-		...
+V836_Tau		...		...		no		yes		unlikely	?
+
+Sz_73
+RU_Lup
+Sz_129
+Sz_90
+HK_Lup
+SY_Cha
+TW_Cha
+FL_Cha
+FM_Cha
+FN_Cha
+ESO-Ha_574
+SR_4
+Elias_20
+Elias_27
+ISO-Oph_83
+ISO-Oph_112
+TW_Hya

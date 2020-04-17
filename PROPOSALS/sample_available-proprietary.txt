@@ -1,0 +1,5 @@
+J04155799        M5.2   0.60    -1.33   2955    140     possible; Pinilla active
+RY_Tau           G0     1.85    1.10    5930    55      possibly useful CO(2-1)
+CIDA_7           M5.1   1.10    -1.12   2968    139     possible; Pinilla active
+DH_Tau_A         M2.3   0.65    -0.69   3515    44      possible; Manara active
+HN_Tau_B         M4.8   0.60    -1.60   3212    138     possible; Manara active
