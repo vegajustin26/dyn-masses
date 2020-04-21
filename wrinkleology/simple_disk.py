@@ -19,8 +19,12 @@ class simple_disk:
         FOV (Optional[float]): Field of view of the model in [arcsec].
         Npix (Optional[int]): Number of pixels along each axis.
         Tb0 (Optional[float]): Brightness temperature in [K] at 1 arcsec.
-        Tbq (Optional[float]): Exponent of the brightness temperature
-            radial profile.
+        Tbqi (Optional[float]): Exponent of the brightness temperature, inner
+             radial profile.
+        Tbqo (Optional[float]): Exponent of the brightness temperature, outer
+             radial profile
+        TbR (Optional[float]): Turnover radius of the brightness temperature
+	     radial profile
         dV0 (Optional[float]): Doppler line width in [m/s] at 1 arcsec.
         dVq (Optional[float]): Exponent of the line width radial profile.
     """
@@ -31,8 +35,9 @@ class simple_disk:
     nwrap = 3
 
     def __init__(self, inc, PA, x0=0.0, y0=0.0, dist=100.0, mstar=1.0, FOV=3.0,
-                 Npix=100, Tb0=50.0, Tbq=-1.0, Tbmax=100, dV0=100.0, dVq=-0.6,
-                 dVmax=300.0, z0=0.0, psi=0.0, z1=0.0, phi=0.0):
+                 Npix=100, Tb0=50.0, Tbqi=1.0, Tbqo=2.0, TbR=2.0, Tbmax=100, 
+                 dV0=100.0, dVq=-0.6, dVmax=300.0, z0=0.0, psi=0.0, z1=0.0, 
+                 phi=0.0):
         self.x0 = x0
         self.y0 = y0
         self.inc = inc
@@ -44,7 +49,7 @@ class simple_disk:
         self.z1 = z1
         self.phi = phi
         self.set_FOV(FOV=FOV, Npix=Npix)
-        self.set_brightness(Tb0=Tb0, Tbq=Tbq, Tbmax=Tbmax)
+        self.set_brightness(Tb0=Tb0, Tbqi=Tbqi, Tbqo=Tbqo, TbR=TbR, Tbmax=Tbmax)
         self.set_linewidth(dV0=dV0, dVq=dVq, dVmax=dVmax)
 
     def set_FOV(self, FOV, Npix):
@@ -94,12 +99,17 @@ class simple_disk:
         if dVmax is not None:
             self.dV = np.where(self.dV <= dVmax, self.dV, dVmax)
 
-    def set_brightness(self, Tb0, Tbq, Tbmax=None):
+    def set_brightness(self, Tb0, Tbqi, Tbqo, TbR, Tbmax=None):
         """
         Set the radial brightness temperature profile in [K].
         """
-        self.Tb0, self.Tbq = Tb0, Tbq
-        self.Tb = simple_disk.powerlaw(self.r_sky * self.dist / 100., Tb0, Tbq)
+        self.Tb0, self.Tbqi, self.Tbqo, self.TbR = Tb0, Tbqi, Tbqo, TbR
+        #self.Tb = simple_disk.powerlaw(self.r_sky * self.dist / 100., Tb0, Tbq)
+        # Tb0 is brightness at r_sky = 1"
+        T_0 = self.Tb0 * (1. / self.TbR)**(self.Tbqi) * \
+              np.exp((1. / self.TbR)**self.Tbqo)
+        self.Tb = T_0 * (self.r_sky / self.TbR)**(-self.Tbqi) * \
+                  np.exp(-(self.r_sky / self.TbR)**self.Tbqo)
         if Tbmax is not None:
             self.Tb = np.where(self.Tb <= Tbmax, self.Tb, Tbmax)
 
