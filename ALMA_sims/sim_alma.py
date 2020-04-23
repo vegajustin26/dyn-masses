@@ -3,7 +3,7 @@ import numpy as np
 execfile('/home/sandrews/mypy/keplerian_mask/keplerian_mask.py')
 
 # - fixed simulation parameters
-fname = 'grid2_Alo_co'
+fname = 'testrich2'
 dt_min = 30
 dt = str(dt_min)+'min'     
 conf = '6'
@@ -22,7 +22,7 @@ rms_simple = ('%.1f' % rms_in) + 'mJy'
 sim_vis = True
 sim_dirty = True
 sim_mask = True
-sim_clean = True
+sim_clean = False
 sim_nf = False
 
 # - reconfigure inputs for use
@@ -78,8 +78,8 @@ if sim_dirty:
 # - Make a keplerian mask from the (noise-free) dirty image
 if sim_mask:
     os.system('rm -rf im_'+fname+'_'+cfg_str+'_'+dt+'_dirty.mask.image')
-    make_mask('im_'+fname+'_'+cfg_str+'_'+dt+'_dirty.image', inc=45, PA=310., 
-              mstar=0.2, dist=150., vlsr=0.0, r_max=0.7, nbeams=1.5)
+    make_mask('im_'+fname+'_'+cfg_str+'_'+dt+'_dirty.image', inc=40, PA=270., 
+              mstar=2.0, dist=150., vlsr=0.0, r_max=1.5, nbeams=1.5)
 
 
 # - Make a CLEAN (noisy) image 

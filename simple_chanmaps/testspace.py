@@ -4,28 +4,57 @@ import os
 from simple_disk import simple_disk
 from astropy.io import fits
 
+# constants to match RADMC3D
+PI = 3.14159265358979323846264338328
+PC = 3.08572e18
+AU = 1.49698e10
+CC = 2.9979245800000e10
+KK = 1.3807e-16
+HH = 6.6262000e-27
+
 # generate a simple disk model class
-disk = simple_disk(inc=40., PA=90., mstar=2.0, FOV=10.20, dist=150., Npix=256,
-                   z0=0.4, psi=0.5, Tb0=50, Tbqi=1.0, Tbqo=2.0, TbR=2.0)
+disk = simple_disk(inc=60., PA=310., mstar=2.0, FOV=14.66, dist=150., Npix=734,
+                   #z0=0.2, psi=0.5, 
+                   Tb0=150, Tbq=-0.5, TbR=4.0, Tbmax=500.,
+                   dV0=50., dVq=-1.0, dVmax=100.)
 
 # specify the velocity channels of interest
-velax = -6200. + 92. * np.arange(136)
+# (choose same velocities as my RADMC3D setup)
+widthkms_0 = 6.2
+velres = 0.092
+extra_width = (2 * widthkms_0 / velres) % 1
+nchan = np.int(2 * widthkms_0 / velres - extra_width)
+widthkms = velres * nchan / 2.
+velax = 1000 * np.linspace(-widthkms, widthkms, nchan)
+
+restfreq = 230.538e9
+
+nu_sc = 230542740066.6497e0 - 71279.19772338867e0 * np.arange(nchan)
+vel_sc = (CC/100.) * (1. - nu_sc / restfreq)
+
+nu_rt = 230542740066.6456e0 - 71279.19375610352e0 * np.arange(nchan)
+vel_rt = (CC/100.) * (1. - nu_rt / restfreq)
+
+for i in range(134): print(f'{vel_sc[i]:.4f}  {velax[i]:.4f}  {vel_rt[i]:.4f}')
+
+
+# plot the radial velocity profile
+
+
 
 # generate channel maps
 cube = disk.get_cube(velax)
 
 # pixel area (in sr)
-pixel_area = (disk.cell_sky * np.pi / (180 * 3600))**2
-print(disk.cell_sky)
+pixel_area = (disk.cell_sky * PI / (180 * 3600))**2
 
 # frequencies (Hz)
-restfreq, cc = 230.538e9, 2.9979e10
-nu = restfreq * (1. - velax / (cc / 100.))
+restfreq = 230.538e9
+nu = restfreq * (1. - velax / (CC / 100.))
 
 # convert cube brightness temperatures into Jy / pixel
-kk = 1.381e-16
 for i in range(len(nu)):
-    cube[i,:,:] *= 1e23 * pixel_area * 2 * nu[i]**2 * kk / cc**2 
+    cube[i,:,:] *= 1e23 * pixel_area * 2 * nu[i]**2 * KK / CC**2 
 
 # specify coordinates / filename you want
 RA  = 65.0
