@@ -12,11 +12,10 @@ CC = 2.9979245800000e10
 KK = 1.3807e-16
 HH = 6.6262000e-27
 
+
 # generate a simple disk model class
-disk = simple_disk(inc=60., PA=310., mstar=2.0, FOV=14.66, dist=150., Npix=734,
-                   #z0=0.2, psi=0.5, 
-                   Tb0=150, Tbq=-0.5, TbR=4.0, Tbmax=500.,
-                   dV0=50., dVq=-1.0, dVmax=100.)
+disk = simple_disk(inc=20., PA=130., mstar=2.0, FOV=14.66, dist=150., Npix=734,
+                   Tb0=150, Tbq=-0.5, r_max=600., Tbmax=500.)
 
 # specify the velocity channels of interest
 # (choose same velocities as my RADMC3D setup)
@@ -26,21 +25,6 @@ extra_width = (2 * widthkms_0 / velres) % 1
 nchan = np.int(2 * widthkms_0 / velres - extra_width)
 widthkms = velres * nchan / 2.
 velax = 1000 * np.linspace(-widthkms, widthkms, nchan)
-
-restfreq = 230.538e9
-
-nu_sc = 230542740066.6497e0 - 71279.19772338867e0 * np.arange(nchan)
-vel_sc = (CC/100.) * (1. - nu_sc / restfreq)
-
-nu_rt = 230542740066.6456e0 - 71279.19375610352e0 * np.arange(nchan)
-vel_rt = (CC/100.) * (1. - nu_rt / restfreq)
-
-for i in range(134): print(f'{vel_sc[i]:.4f}  {velax[i]:.4f}  {vel_rt[i]:.4f}')
-
-
-# plot the radial velocity profile
-
-
 
 # generate channel maps
 cube = disk.get_cube(velax)
@@ -59,10 +43,10 @@ for i in range(len(nu)):
 # specify coordinates / filename you want
 RA  = 65.0
 DEC = 23.0
-outfile = 'testrich2.fits'
+outfile = 'testrich3.fits'
 
 # convert to proper FITS formatting
-cube_for_fits = cube
+cube_for_fits = cube[:,::-1,:]
        
 
 # pack all this away into a FITS file
