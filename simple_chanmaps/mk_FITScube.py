@@ -19,9 +19,6 @@ def mk_FITScube(inc=45., PA=90., mstar=1.0, FOV=5., dist=150., Npix=256,
 
 
     # decide on velocities
-    if ((vel == None) & (datafile == None)):
-        vel = np.linspace(-5000, 5100, 100)
-    
     if datafile is not None:
         # load datafile header
         dat = fits.open(datafile)
