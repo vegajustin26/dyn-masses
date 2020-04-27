@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.io import fits
-from simple_disk import simple_disk
+from mk_FITScube import mk_FITScube
 from vis_sample import vis_sample
 
 def lnprob(theta, data):

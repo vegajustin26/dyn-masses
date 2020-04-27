@@ -3,7 +3,7 @@ from astropy.io import fits
 from simple_disk import simple_disk
 
 def mk_FITScube(inc=45., PA=90., mstar=1.0, FOV=5., dist=150., Npix=256,
-                Tb0=150., Tbq=-1.0, r_max=250., vsys=0., Tbmax=300., vels=None,
+                Tb0=150., Tbq=-1.0, r_max=250., vsys=0., Tbmax=300., vel=None,
                 datafile=None, restfreq=230.538e9, RA=65., DEC=25., 
                 outfile='model.fits'):
 
@@ -19,7 +19,7 @@ def mk_FITScube(inc=45., PA=90., mstar=1.0, FOV=5., dist=150., Npix=256,
 
 
     # decide on velocities
-    if ((vels == None) & (datafile == None)):
+    if ((vel == None) & (datafile == None)):
         vel = np.linspace(-5000, 5100, 100)
     
     if datafile is not None:

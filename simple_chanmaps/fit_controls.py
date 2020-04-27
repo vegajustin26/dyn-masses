@@ -1,8 +1,29 @@
 import os
 import sys
 import numpy as np
+from astropy.io import fits
 from mk_FITScube import mk_FITScube
 from vis_sample import vis_sample
+
+
+### - parse and package the DATA
+# load file
+data_file = 'testrich2.uvfits'
+dat = fits.open(data_file)
+data = dat[0].data
+dhd = dat[0].header
+
+# extract frequencies
+freq0, indx0, nchan = dhd['CRVAL4'], dhd['CRPIX4'], dhd['NAXIS4']
+dfreq = dhd['CDELT4']
+freq = freq0 + (np.arange(nchan) - indx0 + 1) * dfreq
+rfreq = freq[np.int(indx0)]	# approximate mean frequency of cube
+
+# extract (u,v) spacings
+
+sys.exit()
+
+# convert to appropriate units
 
 
 # parameters
