@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from astropy.io import fits
 from simple_disk import simple_disk
 
