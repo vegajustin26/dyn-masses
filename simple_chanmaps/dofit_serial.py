@@ -29,12 +29,12 @@ p0 = [np.random.uniform(p_lo, p_hi, ndim) for i in range(nwalk)]
 
 # compute 1 model to set up GCF, corr caches
 theta = p0[0]
-foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], FOV=FOV, 
-                  dist=dist, Npix=Npix, Tb0=theta[3], Tbq=theta[4], 
-                  r_max=theta[5], vsys=theta[6], Tbmax=Tbmax, 
-                  restfreq=restfreq, datafile=data_file, outfile='model.fits')
+model = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], FOV=FOV, 
+                    dist=dist, Npix=Npix, Tb0=theta[3], Tbq=theta[4], 
+                    r_max=theta[5], vsys=theta[6], Tbmax=Tbmax, 
+                    restfreq=restfreq, datafile=data_file)
 
-tvis, gcf, corr = vis_sample(imagefile='model.fits', uvfile=data_file, 
+tvis, gcf, corr = vis_sample(imagefile=model, uvfile=data_file, 
                              return_gcf=True, return_corr_cache=True, 
                              mod_interp=False)
 
@@ -42,10 +42,10 @@ tvis, gcf, corr = vis_sample(imagefile='model.fits', uvfile=data_file,
 args = dvis, gcf, corr, fixed
 
 # test serialized run
-nsteps = 500
+nsteps = 10
 sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, args=[args])
 start = time.time()
-sampler.run_mcmc(p0, nsteps, progress=True)
+sampler.run_mcmc(p0, nsteps)
 end = time.time()
 print(end-start)
-np.savez('serial_test.chain', chain=sampler.chain)
+#np.savez('serial_test.chain', chain=sampler.chain)

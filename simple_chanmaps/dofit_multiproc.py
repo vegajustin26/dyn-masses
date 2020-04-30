@@ -35,11 +35,11 @@ theta = p0[0]
 foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], FOV=FOV, 
                   dist=dist, Npix=Npix, Tb0=theta[3], Tbq=theta[4], 
                   r_max=theta[5], vsys=theta[6], Tbmax=Tbmax, 
-                  restfreq=restfreq, datafile=data_file, outfile='model.fits')
+                  restfreq=restfreq, datafile=data_file)
 
-tvis, gcf, corr = vis_sample(imagefile='model.fits', uvfile=data_file, 
-                             return_gcf=True, return_corr_cache=True, 
-                             mod_interp=False)
+tvis, gcf, corr = vis_sample(imagefile=foo, uvfile=data_file, return_gcf=True, 
+                             return_corr_cache=True, mod_interp=False)
+
 
 # package data and supplementary information
 global dpassit
@@ -105,18 +105,15 @@ def lnprob_globdata(theta):
 
     # generate a model FITS cube
     # presumes theta = [inc, PA, mstar, Tb0, Tbq, r_max, V_sys, dx, dy]
-    fname = str(np.random.randint(999999))
-    foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], 
-                       FOV=FOV, dist=dist, Npix=Npix, 
-                       Tb0=theta[3], Tbq=theta[4], r_max=theta[5], 
-                       vsys=theta[6], Tbmax=Tbmax, restfreq=restfreq, 
-                       vel=vel, outfile=fname+'.fits')
+    model = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], 
+                        FOV=FOV, dist=dist, Npix=Npix, 
+                        Tb0=theta[3], Tbq=theta[4], r_max=theta[5], 
+                        vsys=theta[6], Tbmax=Tbmax, restfreq=restfreq, vel=vel)
 
     # now sample the FT of the model onto the observed (u,v) points
-    modl_vis = vis_sample(imagefile=fname+'.fits', mu_RA=theta[7], 
+    modl_vis = vis_sample(imagefile=model, mu_RA=theta[7], 
                           mu_DEC=theta[8], gcf_holder=gcf, 
                           corr_cache=corr, mod_interp=False)
-    os.system('rm '+fname+'.fits')
 
     # compute the log-likelihood
     logL = -0.5 * np.sum(dvis.wgts * np.absolute(dvis.VV.T - modl_vis)**2)
