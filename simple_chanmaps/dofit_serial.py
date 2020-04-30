@@ -6,9 +6,7 @@ from mk_FITScube import mk_FITScube
 from vis_sample import vis_sample
 from vis_sample.file_handling import import_data_uvfits
 from lnprob import lnprob
-from lnprob_globdata import lnprob_globdata
 import emcee
-os.environ["OMP_NUM_THREADS"] = "1"
 
 # parse and package the DATA
 data_set = 'rich_io.sim.config5.30min.noisy.specbin'
@@ -41,26 +39,13 @@ tvis, gcf, corr = vis_sample(imagefile='model.fits', uvfile=data_file,
                              mod_interp=False)
 
 # package data and supplementary information
-global args
 args = dvis, gcf, corr, fixed
 
-
-# test MPI run
-from multiprocessing import Pool
-with Pool() as pool:
-    sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_globdata, pool=pool)
-    start = time.time()
-    sampler.run_mcmc(p0, 10, progress=True)
-    end = time.time()
-    print("MPI took {0:.1f} seconds".format(end-start))
-
-sys.exit()
-
-
 # test serialized run
-nsteps = 10
+nsteps = 500
 sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, args=[args])
 start = time.time()
 sampler.run_mcmc(p0, nsteps, progress=True)
 end = time.time()
-print("Serial took {0:.1f} seconds".format(end-start))
+print(end-start)
+np.savez('serial_test.chain', chain=sampler.chain)

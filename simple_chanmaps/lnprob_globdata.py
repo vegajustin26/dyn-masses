@@ -2,7 +2,7 @@ import numpy as np
 from mk_FITScube import mk_FITScube
 from vis_sample import vis_sample
 
-def lnprob(theta, args):
+def lnprob_globdata(theta):
 
     # parse input arguments
     dvis, gcf, corr, fixed = args
