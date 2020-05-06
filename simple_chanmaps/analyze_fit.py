@@ -7,13 +7,13 @@ import sys
 
 
 # emcee backend file
-fname = 'rich_io_nf'
+fname = 'rich_io_noisy'
 
 # load the backend
 reader = emcee.backends.HDFBackend(fname+'.h5')
 
 # set burn-in
-burnin = 100
+burnin = 500
 
 # set parameter labels, truths
 lbls = ['i', 'PA', 'M', 'Tb0', 'Tbq', 'r_max', 'vsys', 'dx', 'dy']

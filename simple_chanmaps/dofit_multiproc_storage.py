@@ -11,11 +11,9 @@ from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
 
 # parse and package the DATA
-#data_set = 'rich_io.sim.config5.30min.noisy.specbin'
-data_set = 'rich_io_nf'
+data_set = 'rich_io_noisy'
 data_file = 'fake_data/'+data_set+'.uvfits'
 dvis = import_data_uvfits(data_file)
-dvis.wgts *= 0.335 / 2.
 
 # extract the proper velocities from the data file
 dat = fits.open(data_file)
@@ -145,7 +143,7 @@ os.system('rm -rf '+filename)
 backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)
 
-max_steps = 1000
+max_steps = 10000
 # perform the inference
 with Pool() as pool:
     # set up sampler
