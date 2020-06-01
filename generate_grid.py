@@ -11,16 +11,16 @@ from raytrace_maps import raytrace_maps
 
 
 #model_name = ['grid1_A', 'grid1_B', 'grid1_C', 'grid1_D', 'grid1_E', 'grid1_F']
-model_name = ['grid2_Alo']
+model_name = ['phys1_i40']
 
 for i in range(len(model_name)):
     # generate disk structure
-#   di = sim_disk(model_name[i])
-
+    di = sim_disk(model_name[i])
+    
     # make spherical and cylindrical plots
-#    _ = plotutils(model_name[i])	
-#    di = sim_disk(model_name[i], writestruct=False, cyl=True)
-#    _ = plotutils(model_name[i], struct=di, cyl=True)
+    _ = plotutils(model_name[i])	
+    di = sim_disk(model_name[i], writestruct=False, cyl=True)
+    _ = plotutils(model_name[i], struct=di, cyl=True)
 
     # raytrace out a set of channel maps
     t0 = time.time()

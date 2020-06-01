@@ -23,7 +23,7 @@ class sim_disk:
 
     # fixed values
     min_dens = 1e0  # minimum gas density in [H2/cm**3]
-    max_dens = 1e20 # maximum gas density in [H2/cm**3]
+    max_dens = 1e25 # maximum gas density in [H2/cm**3]
     min_temp = 5e0  # minimum temperature in [K]
     max_temp = 8e2  # maximum temperature in [K]
 
@@ -224,16 +224,24 @@ class sim_disk:
 
     # Density Structure.
 
-    def sigma_gas(self, r=None, **args):
+    def sigma_gas(self, r=None, print_sig0=False, **args):
     
         # Similarity-solution
         if self.diskpars["gas_density"]["type"] == 'self_similar':
             try:
-                Rc, sig0, p1 = args["Rc"] * self.AU, args["sig0"], args["p1"]
+                Rc, p1 = args["Rc"] * self.AU, args["p1"]
                 p2 = args.pop("p2", 2.-p1)
             except KeyError:
                 raise ValueError("Specify at least `Rc`, `sig0`, `pg1`.")
+            # for now, assume you're given a mass, not a sig0
+            Mdisk = args["mdisk"] * self.msun
             r = self.rvals if r is None else r
+            # convert to sig0
+            sig_u = self.powerlaw(self.rvals, 1.0, -p1, Rc) * \
+                                  np.exp(-(self.rvals / Rc)**p2)
+            sig0 = Mdisk / (2*np.pi * np.trapz(self.rvals * sig_u, self.rvals))
+            if print_sig0:
+                print("sig0 = %f" % sig0)
             sig = self.powerlaw(r, sig0, -p1, Rc) * np.exp(-(r / Rc)**p2)
 
             # impose any substructures
@@ -359,6 +367,12 @@ class sim_disk:
             zrmax = args.pop("zrmax", 1.0)
             rmin = args.pop("rmin", self.rcyl.min() / self.AU) * self.AU
             rmax = args.pop("rmax", self.rcyl.max() / self.AU) * self.AU
+            Sig_pd = 10.**(args.pop("logNpd", 21.3)) * self.mu * self.m_p
+            # interpolate to figure out rmax based on Sig_pd
+            siggas = self.sigma_gas(**args, print_sig0=True)
+            sigint = interp1d(siggas, self.rvals)
+            rmax = sigint(Sig_pd)
+            print("rmax_abund = %f" % (rmax/self.AU))
 
         # default scenario is to cycle through spherical grid; alternative is 
         # operate on a fixed grid in cylindrical coordinates (if cyl=True)

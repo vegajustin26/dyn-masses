@@ -7,7 +7,7 @@ import sys
 
 
 # emcee backend file
-fname = 'rich_io_noisy'
+fname = 'rich_io_lowSNR_noisy'
 
 # load the backend
 reader = emcee.backends.HDFBackend(fname+'.h5')
@@ -62,7 +62,7 @@ fig.clf()
 # corner plot to view covariances
 levs = 1. - np.exp(-0.5*(np.arange(3)+1)**2)
 flat_chain = samples.reshape(-1, ndim)
-fig, axes = plt.subplots(ndim, ndim, figsize=(6.5, 6.5))
+fig, ax = plt.subplots(ndim, ndim, figsize=(8., 8.))
 corner.corner(flat_chain, plot_datapoints=False, levels=levs, 
               labels=lbls, fig=fig, truths=theta)
 fig.savefig(fname + '.corner.png')

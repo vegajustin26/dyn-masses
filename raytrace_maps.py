@@ -44,7 +44,7 @@ class raytrace_maps:
                   'iline %d ' % setpars["transition"] + \
                   'widthkms %.5f ' % widthkms + \
                   'linenlam %d ' % nchan + \
-                  'setthreads 5')
+                  'setthreads 6')
 
 
         # make a FITS cube

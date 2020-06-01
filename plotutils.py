@@ -20,6 +20,8 @@ class plotutils:
 
     def __init__(self, mname, struct=None, cyl=False):
 
+        self.mname = mname
+
         # load parameter file
         conf = open(mname + ".yaml")
         config = yaml.load(conf, Loader=yaml.FullLoader)
@@ -280,6 +282,13 @@ class plotutils:
         im = ax.contourf(xx, yyy, toplot, 
                          levels=levels, cmap=cmap, **contourf_kwargs)
 
+        if cyl:
+            ax.plot(xx, 0.1 * xx, ':k')
+            ax.plot(xx, 0.2 * xx, ':k')
+            ax.plot(xx, 0.3 * xx, ':k')
+            gr, gs, gH = np.loadtxt(self.mname+'/gas_profiles.txt',skiprows=1).T
+            ax.plot(gr, gH, '--', color='gray', lw=3)
+            ax.contour(xx, yyy, toplot, levels=[20.])
         cax = make_axes_locatable(ax)
         cax = cax.append_axes("right", size="3%", pad="1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(0, 300, 20))
@@ -332,7 +341,6 @@ class plotutils:
         cmap = contourf_kwargs.pop("cmap", "afmhot_r")
         im = ax.contourf(xx, yyy, toplot, 
                          levels=levels, cmap=cmap, **contourf_kwargs)
-
         cax = make_axes_locatable(ax)
         cax = cax.append_axes("right", size="3%", pad="1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))

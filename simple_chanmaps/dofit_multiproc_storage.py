@@ -11,7 +11,7 @@ from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
 
 # parse and package the DATA
-data_set = 'rich_io_noisy'
+data_set = 'rich_io_lowSNR_noisy'
 data_file = 'fake_data/'+data_set+'.uvfits'
 dvis = import_data_uvfits(data_file)
 
@@ -148,7 +148,9 @@ max_steps = 10000
 with Pool() as pool:
     # set up sampler
     sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_globdata, pool=pool,
-                                    backend=backend)
+                                    backend=backend, 
+                                    moves=[(emcee.moves.DEMove(),0.8),
+                                           (emcee.moves.DESnookerMove(),0.2),],)
 
     # track autocorrelation time
     index = 0
