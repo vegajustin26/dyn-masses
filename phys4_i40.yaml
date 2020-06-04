@@ -94,7 +94,7 @@ outputs:
                                 # incl < 90, "bottom" if incl > 90 
 
     spatial:
-        ires: 0.050
+        ires: 0.010
         RA: 240.0
         DEC: -40.0
 

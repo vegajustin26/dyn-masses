@@ -11,7 +11,7 @@ from raytrace_maps import raytrace_maps
 
 
 #model_name = ['grid1_A', 'grid1_B', 'grid1_C', 'grid1_D', 'grid1_E', 'grid1_F']
-model_name = ['phys1_i40']
+model_name = ['phys4_i40']
 
 for i in range(len(model_name)):
     # generate disk structure
