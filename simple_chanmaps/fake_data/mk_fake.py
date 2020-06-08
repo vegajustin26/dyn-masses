@@ -5,21 +5,22 @@ from vis_sample import vis_sample
 from vis_sample.file_handling import import_data_uvfits
 sys.path.append('../')
 from mk_FITScube import mk_FITScube
+from mk_FITScube_OLD import mk_FITScube_OLD
 
 # template file
 temp_uv  = 'cfg5_15min_dv0.2kms_v0-7.5kms_nch77'
 template = 'template_uvfits/template_'+temp_uv+'.uvfits'
 
 # output files
-fout = 'std_medv_medr'
+fout = 'simp3_std_medv_medr'
 
 
 
 # RMS noise per naturally weighted beam per channel in output
 RMS = 6.6	# in mJy
 
-# parameters: theta = [inc, PA, mstar, Tb0, Tbq, r_max, vsys, dx, dy]
-theta = np.array([30., 40., 1.75, 150., -0.5, 300., 0.0, 0.0, 0.0])
+# inc, PA, mstar, Tb0, Tbq, r_l, z0, vsys, dx, dy]
+theta = [40., 130., 0.7, 65., -0.5, 200., 23., 0.0, 0.0, 0.0]
 FOV = 8.0
 dist = 150.
 Npix = 256
@@ -42,8 +43,9 @@ vel = 2.9979245800000e10 * (1. - freqs / restfreq) / 100.
 ### - compute a model cube (SkyImage object)
 foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], FOV=FOV, 
                   dist=dist, Npix=Npix, Tb0=theta[3], Tbq=theta[4], 
-                  r_max=theta[5], vsys=theta[6], Tbmax=Tbmax, 
-                  restfreq=restfreq, vel=vel)
+                  r_l=theta[5], z0=theta[6], vsys=theta[7], Tbmax=Tbmax, 
+                  r_max=theta[5], restfreq=restfreq, vel=vel)
+
 
 ### - sample it on the template (u,v) spacings: NOISE FREE
 os.system('rm -rf sim_uvfits/'+fout+'_noiseless.uvfits')

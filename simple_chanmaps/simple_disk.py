@@ -18,7 +18,7 @@ class simple_disk:
         mstar (Optional[float]): Mass of the central star in [Msun].
         FOV (Optional[float]): Field of view of the model in [arcsec].
         Npix (Optional[int]): Number of pixels along each axis.
-        Tb0 (Optional[float]): Brightness temperature in [K] at 1 arcsec.
+        Tb0 (Optional[float]): Brightness temperature in [K] at 100 au.
         Tbq (Optional[float]): Exponent of the brightness temperature
             radial profile.
         dV0 (Optional[float]): Doppler line width in [m/s] at 1 arcsec.
@@ -30,15 +30,15 @@ class simple_disk:
     msun = 1.988e30
     nwrap = 3
 
-    def __init__(self, inc, PA, x0=0.0, y0=0.0, mstar=1.0, dist=100.0, z0=0.0,
-                 psi=1.0, z1=0.0, phi=1.0, r_min=0.0, r_max=100.0, Tb0=50.0,
+    def __init__(self, inc, PA, x0=0.0, y0=0.0, mstar=1.0, dist=100.0, 
+                 z0=0.0, psi=1.0, zphi=1.0, r_min=0.0, r_max=500.0, Tb0=50.0,
                  Tbq=-1.0, Tbmax=100.0, Tbmax_b=20.0, dV0=None, dVq=None,
-                 dVmax=300.0, tau0=5.0, tauq=0.0, taumax=None, FOV=None,
-                 Npix=128):
+                 dVmax=300.0, tau0=5.0, tauq=0.0, taueta=50., taumax=None, 
+                 r_l=200., FOV=None, Npix=128):
 
         # Set the disk geometrical properties.
         self.x0, self.y0, self.inc, self.PA, self.dist = x0, y0, inc, PA, dist
-        self.z0, self.psi, self.z1, self.phi = z0, psi, z1, phi
+        self.z0, self.psi, self.zphi = z0, psi, zphi
         self.r_min, self.r_max = r_min, r_max
         self.FOV = 2.2 * self.r_max / self.dist if FOV is None else FOV
         self.Npix = Npix
@@ -47,7 +47,8 @@ class simple_disk:
         self.mstar = mstar
         self.Tb0, self.Tbq, self.Tbmax, self.Tbmax_b = Tb0, Tbq, Tbmax, Tbmax_b
         self.dV0, self.dVq, self.dVmax = dV0, dVq, dVmax
-        self.tau0, self.tauq, self.taumax = tau0, tauq, taumax
+        self.tau0, self.tauq, self.taueta = tau0, tauq, taueta
+        self.taumax, self.r_l = taumax, r_l
 
         # Check if dV should be set by thermal broadening.
         self._check_thermal_broadening()
@@ -87,8 +88,7 @@ class simple_disk:
         self.t_disk = np.arctan2(self.y_disk, self.x_disk)
 
         f = self.disk_coords(x0=self.x0, y0=self.y0, inc=self.inc, PA=self.PA,
-                             z0=self.z0, psi=self.psi, z1=self.z1,
-                             phi=self.phi)
+                             z0=self.z0, psi=self.psi, zphi=self.zphi)
 
         self.r_sky_f = f[0] * self.dist
         self.t_sky_f = f[1]
@@ -98,7 +98,7 @@ class simple_disk:
             self._flat_disk = False
             b = self.disk_coords(x0=self.x0, y0=self.y0, inc=-self.inc,
                                  PA=self.PA, z0=self.z0, psi=self.psi,
-                                 z1=self.z1, phi=self.phi)
+                                 zphi=self.zphi)
         else:
             self._flat_disk = True
             b = f
@@ -134,7 +134,8 @@ class simple_disk:
         ``dVq`` values are provided when instantiating the class.
         """
         if self.dV0 is None:
-            self.dV0 = (2. * sc.k * self.Tb0 / self.mu / sc.m_p)**0.5
+            #self.dV0 = (2. * sc.k * self.Tb0 / self.mu / sc.m_p)**0.5
+            self.dV0 = (2. * sc.k * self.Tb0 / 18. / sc.m_p)**0.5
         if self.dVq is None:
             self.dVq = 0.5 * self.Tbq
 
@@ -147,8 +148,12 @@ class simple_disk:
             self.tau0 = 0.0
         if self.tauq is None:
             self.tauq = self.Tbq
+        if self.taueta is None:
+            self.taueta = 50.
         if self.taumax is None:
             self.taumax = 100.0
+        if self.r_l is None:
+            self.r_l = 200.0
 
     def _set_linewidth(self):
         """
@@ -197,7 +202,8 @@ class simple_disk:
         """
         Sets the tau radial profile.
         """
-        self.tau = self.tau0 * np.power(self.r_sky_f / 100., self.tauq)
+        self.tau = self.tau0 * np.power(self.r_sky_f / self.r_l, self.tauq) * \
+                   np.exp(-(self.r_sky_f / self.r_l)**self.taueta)
         self.tau = np.where(self._in_disk_f, self.tau, 0.0)
 
     def interpolate_model(self, x, y, param, x_unit='au', param_max=None,
@@ -313,7 +319,7 @@ class simple_disk:
     # -- Deprojection Functions -- #
 
     def disk_coords(self, x0=0.0, y0=0.0, inc=0.0, PA=0.0, z0=0.0, psi=0.0,
-                    z1=0.0, phi=0.0, frame='cylindrical'):
+                    zphi=0.0, frame='cylindrical'):
         r"""
         Get the disk coordinates given certain geometrical parameters and an
         emission surface. The emission surface is parameterized as a powerlaw
@@ -375,7 +381,8 @@ class simple_disk:
         Returns the emission height in [arcsec].
         """
         z = self.z0 * np.power(r * self.dist / 100.0, self.psi) / self.dist
-        z += self.z1 * np.power(r * self.dist / 100.0, self.phi) / self.dist
+        #z += self.z1 * np.power(r * self.dist / 100.0, self.phi) / self.dist
+        z *= np.exp(-(r * self.dist / self.r_l)**self.zphi)
         if self.z0 >= 0.0:
             return np.clip(z, a_min=0.0, a_max=None)
         return np.clip(z, a_min=None, a_max=0.0)
@@ -508,13 +515,15 @@ class simple_disk:
         self.dVmax = self.dVmax if dVmax is None else dVmax
         self._set_linewidth()
 
-    def set_tau(self, tau0=None, tauq=None, taumax=None):
+    def set_tau(self, tau0=None, tauq=None, taueta=None, r_l=None, taumax=None):
         """
         Helper function to redefine the optical depth profile.
         """
         self.tau0 = self.tau0 if tau0 is None else tau0
         self.tauq = self.tauq if tauq is None else tauq
+        self.taueta = self.taueta if taueta is None else taueta
         self.taumax = self.taumax if taumax is None else taumax
+        self.r_l = self.r_l if r_l is None else r_l
         self._set_tau()
 
     # -- Pseudo Image Functions -- #
@@ -953,6 +962,7 @@ class simple_disk:
             ax2.set_xlim(ax.get_xlim()[0] / self.dist,
                          ax.set_xlim()[1] / self.dist)
             ax2.set_xlabel('Radius [arcsec]')
+        return fig
 
     def plot_linewidth(self, fig=None, top_axis=True):
         """
@@ -975,6 +985,7 @@ class simple_disk:
             ax2.set_xlim(ax.get_xlim()[0] / self.dist,
                          ax.set_xlim()[1] / self.dist)
             ax2.set_xlabel('Radius [arcsec]')
+        return fig
 
     def plot_brightness(self, fig=None, top_axis=True):
         """
@@ -997,6 +1008,7 @@ class simple_disk:
             ax2.set_xlim(ax.get_xlim()[0] / self.dist,
                          ax.set_xlim()[1] / self.dist)
             ax2.set_xlabel('Radius [arcsec]')
+        return fig
 
     def plot_tau(self, fig=None, top_axis=True):
         """
@@ -1019,6 +1031,7 @@ class simple_disk:
             ax2.set_xlim(ax.get_xlim()[0] / self.dist,
                          ax.set_xlim()[1] / self.dist)
             ax2.set_xlabel('Radius [arcsec]')
+        return fig
 
     def plot_emission_surface(self, fig=None, top_axis=True):
         """
@@ -1041,6 +1054,7 @@ class simple_disk:
             ax2.set_xlim(ax.get_xlim()[0] / self.dist,
                          ax.set_xlim()[1] / self.dist)
             ax2.set_xlabel('Radius [arcsec]')
+        return fig
 
     def plot_radii(self, ax, rvals, contour_kwargs=None, projection='sky',
                    side='f'):

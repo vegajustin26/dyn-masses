@@ -26,5 +26,18 @@
 
 [B] Make a simulated dataset using that template:
 
+(1) Edit the filenames (template and output) and parameter values in 
+    mk_fake.py, and then run it.  This will generate a synthetic (noisy)
+    UVFITS file in sim_uvfits/.  
 
+(2) Edit the filenames and mask parameters in image_sim.py, and run it:
+
+    CASA> execfile('image_sim.py')
+
+    Check that the resulting image cube conforms to expectations, in terms of
+    emission levels and RMS noise.
+
+(3) Decide which channels you will fit.  For now, I'm taking 1 channel on 
+    either side of obvious emission; but realistically we'll need to come up
+    with a true scheme here.
 

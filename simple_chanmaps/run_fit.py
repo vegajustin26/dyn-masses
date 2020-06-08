@@ -1,6 +1,4 @@
-import os
-import sys
-import time
+import os, sys, time
 import numpy as np
 from astropy.io import fits
 from mk_FITScube import mk_FITScube
@@ -10,9 +8,10 @@ import emcee
 from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
 
+
 # parse and package the DATA
-data_set = 'rich_io_lowSNR_noisy'
-data_file = 'fake_data/'+data_set+'.uvfits'
+data_set = 'simp3_std_medv_medr_noiseless'
+data_file = 'fake_data/sim_uvfits/'+data_set+'.uvfits'
 dvis = import_data_uvfits(data_file)
 
 # extract the proper velocities from the data file
@@ -25,6 +24,13 @@ dfreq = hdr['CDELT4']
 freqs = freq0 + (np.arange(nchan) - indx0 + 1) * dfreq
 dvis.freqs = freqs
 
+# extract only a subset of the velocities to fit
+vidx_lo, vidx_hi = 19, 57
+dvis.VV = dvis.VV[vidx_lo:vidx_hi, :]
+dvis.wgts = dvis.wgts[:, vidx_lo:vidx_hi]
+dvis.freqs = dvis.freqs[vidx_lo:vidx_hi]
+dvis.rfreq = np.mean(dvis.freqs)
+
 # fixed parameters
 FOV = 8.0
 dist = 150.
@@ -33,21 +39,27 @@ Tbmax = 500.
 restfreq = 230.538e9
 fixed = FOV, dist, Npix, Tbmax, restfreq
 
+# calculate velocities (in m/s)
+CC = 2.9979245800000e10
+vel = CC * (1. - dvis.freqs / restfreq) / 100.
+
+
 # initialize walkers
-p_lo = np.array([20., 30., 1.50, 100., -0.8, 200., -0.1, -0.1, -0.1])
-p_hi = np.array([40., 50., 2.00, 200., -0.2, 400.,  0.1,  0.1,  0.1])
-ndim, nwalk = len(p_lo), 4 * len(p_lo)
+p_lo = np.array([30., 120., 0.50, 40., -0.8, 100.,  5., 10., -0.1, -0.1, -0.1])
+p_hi = np.array([50., 140., 0.90, 90., -0.2, 300., 30., 40.,  0.1,  0.1,  0.1])
+ndim, nwalk = len(p_lo), 5 * len(p_lo)
 p0 = [np.random.uniform(p_lo, p_hi, ndim) for i in range(nwalk)]
 
 # compute 1 model to set up GCF, corr caches
 theta = p0[0]
-foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], FOV=FOV, 
-                  dist=dist, Npix=Npix, Tb0=theta[3], Tbq=theta[4], 
-                  r_max=theta[5], vsys=theta[6], Tbmax=Tbmax, 
-                  restfreq=restfreq, datafile=data_file)
+foo = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], 
+                  FOV=FOV, dist=dist, Npix=Npix, restfreq=restfreq, vel=vel,
+                  Tb0=theta[3], Tbq=theta[4], Tbmax=Tbmax, Tbmax_b=theta[7],
+                  r_l=theta[5], z0=theta[6], vsys=theta[8], r_max=theta[5]) 
 
-tvis, gcf, corr = vis_sample(imagefile=foo, uvfile=data_file, return_gcf=True, 
-                             return_corr_cache=True, mod_interp=False)
+tvis, gcf, corr = vis_sample(imagefile=foo, uu=dvis.uu, vv=dvis.vv, 
+                             return_gcf=True, return_corr_cache=True, 
+                             mod_interp=False)
 
 
 # package data and supplementary information
@@ -67,13 +79,13 @@ def lnprob_globdata(theta):
     # inc: p(i) = sin(i)
     if ((theta[0] > 0.) and (theta[0] < 90.)):
         #ptheta[0] = np.sin(np.radians(theta[0]))
-        ptheta[0] = -0.5 * (theta[0] - 30.)**2 / 5.**2
+        ptheta[0] = -0.5 * (theta[0] - 40.)**2 / 5.**2
     else: return -np.inf
 
     # PA: p(PA) = uniform(0, 360)
     if ((theta[1] > 0.) and (theta[1] < 360.)): 
         #ptheta[1] = 1./360.
-        ptheta[1] = -0.5 * (theta[1] - 40.)**2 / 5.**2
+        ptheta[1] = -0.5 * (theta[1] - 310.)**2 / 5.**2
     else: return -np.inf
 
     # Mstar: p(Mstar) = uniform(0, 5)
@@ -91,24 +103,34 @@ def lnprob_globdata(theta):
         ptheta[4] = 0.
     else: return -np.inf
 
-    # r_max: p(r_max) = uniform(0, dist * FOV / 2)		
+    # r_l: p(r_l) = uniform(0, dist * FOV / 2)		
     if ((theta[5] > 10.) and (theta[5] < (dist * FOV / 2))):
         ptheta[5] = 0.
     else: return -np.inf
 
-    # V_sys: p(V_sys) = normal(0.0, 0.1)	# adjusted for each case
-    if ((theta[6] > -0.2) & (theta[6] < 0.2)):
+    # z0: p(z0) = uniform(0, 0.4)
+    if ((theta[6] >= 0.0) and (theta[6] <= 40.)):
         ptheta[6] = 0.
     else: return -np.inf
 
-    # dx: p(dx) = normal(0.0, 0.1)		# adjusted for each case
-    if ((theta[7] > -0.2) & (theta[7] < 0.2)):
+    # Tbmax_b: p(Tbmax_b) = uniform(5, 50)
+    if ((theta[7] >= 5.) and (theta[7] <= 50.)):
         ptheta[7] = 0.
     else: return -np.inf
 
-    # dy: p(dy) = normal(0.0, 0.1)		# adjusted for each case
+    # V_sys: p(V_sys) = normal(0.0, 0.1)	# adjusted for each case
     if ((theta[8] > -0.2) & (theta[8] < 0.2)):
         ptheta[8] = 0.
+    else: return -np.inf
+
+    # dx: p(dx) = normal(0.0, 0.1)		# adjusted for each case
+    if ((theta[9] > -0.2) & (theta[9] < 0.2)):
+        ptheta[9] = 0.
+    else: return -np.inf
+
+    # dy: p(dy) = normal(0.0, 0.1)		# adjusted for each case
+    if ((theta[10] > -0.2) & (theta[10] < 0.2)):
+        ptheta[10] = 0.
     else: return -np.inf
     
     # constants
@@ -118,16 +140,16 @@ def lnprob_globdata(theta):
     vel = CC * (1. - dvis.freqs / restfreq) / 100.
 
     # generate a model FITS cube
-    # presumes theta = [inc, PA, mstar, Tb0, Tbq, r_max, V_sys, dx, dy]
+    # presumes theta = [inc, PA, mstar, Tb0, Tbq, r_l, z0, Tback, Vsys, dx, dy]
     model = mk_FITScube(inc=theta[0], PA=theta[1], mstar=theta[2], 
-                        FOV=FOV, dist=dist, Npix=Npix, 
-                        Tb0=theta[3], Tbq=theta[4], r_max=theta[5], 
-                        vsys=theta[6], Tbmax=Tbmax, restfreq=restfreq, vel=vel)
+                        FOV=FOV, dist=dist, Npix=Npix, restfreq=restfreq,
+                        Tb0=theta[3], Tbq=theta[4], Tbmax_b=theta[7],
+                        r_l=theta[5], z0=theta[6], vsys=theta[8], 
+                        r_max=theta[5], vel=vel)
 
     # now sample the FT of the model onto the observed (u,v) points
-    modl_vis = vis_sample(imagefile=model, mu_RA=theta[7], 
-                          mu_DEC=theta[8], gcf_holder=gcf, 
-                          corr_cache=corr, mod_interp=False)
+    modl_vis = vis_sample(imagefile=model, mu_RA=theta[8], mu_DEC=theta[9], 
+                          gcf_holder=gcf, corr_cache=corr, mod_interp=False)
 
     # compute the log-likelihood
     logL = -0.5 * np.sum(dvis.wgts * np.absolute(dvis.VV.T - modl_vis)**2)
@@ -143,14 +165,12 @@ os.system('rm -rf '+filename)
 backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)
 
-max_steps = 10000
+max_steps = 20000
 # perform the inference
 with Pool() as pool:
     # set up sampler
     sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_globdata, pool=pool,
-                                    backend=backend, 
-                                    moves=[(emcee.moves.DEMove(),0.8),
-                                           (emcee.moves.DESnookerMove(),0.2),],)
+                                    backend=backend)
 
     # track autocorrelation time
     index = 0
