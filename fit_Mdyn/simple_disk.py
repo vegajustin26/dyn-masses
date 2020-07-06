@@ -129,14 +129,14 @@ class simple_disk:
     def v0_sky(self):
         return self.v0_f
 
-    def _check_thermal_broadening(self):
+    def _check_thermal_broadening(self, mu=28.0):
         """
         Set the Doppler linewidth to the themral linewidth if no ``dV0`` or
         ``dVq`` values are provided when instantiating the class.
         """
         if self.dV0 is None:
             #self.dV0 = (2. * sc.k * self.Tb0 / self.mu / sc.m_p)**0.5
-            self.dV0 = (2. * sc.k * self.Tb0 / 18. / sc.m_p)**0.5
+            self.dV0 = (2. * sc.k * self.Tb0 / mu / sc.m_p)**0.5
         if self.dVq is None:
             self.dVq = 0.5 * self.Tbq
 
@@ -559,7 +559,7 @@ class simple_disk:
 
         # Make the image cube.
 
-        cube = np.array([self.get_channel(vbins[i], vbins[i+1], dv0)
+        cube = np.array([self.get_channel(vbins[i], vbins[i+1], dv0=dv0)
                          for i in range(velax.size)])
         assert cube.shape[0] == velax.size, "not all channels created"
 
@@ -692,8 +692,9 @@ class simple_disk:
         Calculate the average tau profile assuming a single Gaussian component.
         """
         tau, dV, v0 = self.tau, self.dV_f, self.v0_f + dv0
-        f = tau * np.pi**0.5 * dV / 2.0 / (v_max - v_min)
-        return f * (erf((v0 - v_min) / dV) - erf((v0 - v_max) / dV))
+        return tau * np.exp(-((np.mean(v_min, v_max) - v0) / dV)**2)
+        #f = tau * np.pi**0.5 * dV / 2.0 / (v_max - v_min)
+        #return f * (erf((v0 - v_min) / dV) - erf((v0 - v_max) / dV))
 
     def _calc_flux(self, v_min, v_max, dv0=0.0, side='f'):
         """
@@ -706,8 +707,9 @@ class simple_disk:
         else:
             quote = "Unknown 'side' value {}. Must be 'f' or 'r'."
             raise ValueError(quote.format(side))
-        f = Tb * np.pi**0.5 * dV / 2.0 / (v_max - v_min)
-        return f * (erf((v0 - v_min) / dV) - erf((v0 - v_max) / dV))
+        return Tb * np.exp(-((np.mean([v_min, v_max]) - v0) / dV)**2)
+        #f = Tb * np.pi**0.5 * dV / 2.0 / (v_max - v_min)
+        #return f * (erf((v0 - v_min) / dV) - erf((v0 - v_max) / dV))
 
     def _calc_frac(self, v_min, v_max, dv0=0.0):
         """
